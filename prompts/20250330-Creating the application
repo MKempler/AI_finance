@@ -98,3 +98,14 @@ the following format for tracking prompts:
 Deployment Considerations: 
 While full deployment (server, domain, TLS) will be part of the final project, teams 
 should begin preparing for real-world implementation. 
+
+
+
+Prompt 2: 
+How can I view this application and make sure the app is working appropriately? 
+
+Prompt 3: 
+Debugging: Why do non of the buttons on the frontend work appropriately? The dahsboard seems to have all the appropriate buttons but I am unable to press them and see their specified page.
+
+Prompt 4: I want users to be forced to login before they are able to view their specific dashboard. Once a user logs out they should be taken to the login page. 
+
