@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - AI Finance Tracker</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #f7fafc;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .login-container {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .login-header h1 {
+            color: #2d3748;
+            margin: 0;
+            font-size: 1.8rem;
+        }
+
+        .login-header p {
+            color: #718096;
+            margin: 0.5rem 0 0;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #4a5568;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 5px;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #4299e1;
+        }
+
+        .btn-primary {
+            width: 100%;
+            padding: 0.75rem;
+            background-color: #4299e1;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .btn-primary:hover {
+            background-color: #3182ce;
+        }
+
+        .btn-primary:disabled {
+            background-color: #cbd5e0;
+            cursor: not-allowed;
+        }
+
+        .error-message {
+            color: #e53e3e;
+            background-color: #fff5f5;
+            padding: 0.75rem;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+            display: none;
+        }
+
+        .success-message {
+            color: #38a169;
+            background-color: #f0fff4;
+            padding: 0.75rem;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+            display: none;
+        }
+
+        .links {
+            margin-top: 1.5rem;
+            text-align: center;
+        }
+
+        .links a {
+            color: #4299e1;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+
+        .links a:hover {
+            text-decoration: underline;
+        }
+
+        .links span {
+            margin: 0 0.5rem;
+            color: #cbd5e0;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 1rem;
+        }
+
+        .loading i {
+            color: #4299e1;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <h1>Welcome Back</h1>
+            <p>Sign in to your AI Finance Tracker account</p>
+        </div>
+
+        <div class="error-message" id="errorMessage"></div>
+        <div class="success-message" id="successMessage"></div>
+
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="submit" class="btn-primary" id="loginButton">Sign In</button>
+            <div class="loading" id="loading">
+                <i class="fas fa-spinner fa-spin fa-2x"></i>
+            </div>
+        </form>
+
+        <div class="links">
+            <a href="/forgot-password.html">Forgot Password?</a>
+            <span>|</span>
+            <a href="/register.html">Create Account</a>
+        </div>
+    </div>
+
+    <script src="js/auth.js"></script>
+    <script>
+        // Check if user is already logged in
+        if (auth.isAuthenticated()) {
+            window.location.href = '/';
+        }
+
+        // Get DOM elements
+        const loginForm = document.getElementById('loginForm');
+        const emailInput = document.getElementById('email');
+        const passwordInput = document.getElementById('password');
+        const loginButton = document.getElementById('loginButton');
+        const errorMessage = document.getElementById('errorMessage');
+        const successMessage = document.getElementById('successMessage');
+        const loading = document.getElementById('loading');
+
+        // Function to show error message
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+            successMessage.style.display = 'none';
+            loading.style.display = 'none';
+            loginButton.disabled = false;
+        }
+
+        // Function to show success message
+        function showSuccess(message) {
+            successMessage.textContent = message;
+            successMessage.style.display = 'block';
+            errorMessage.style.display = 'none';
+            loading.style.display = 'none';
+        }
+
+        // Handle form submission
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Reset messages
+            errorMessage.style.display = 'none';
+            successMessage.style.display = 'none';
+            
+            // Show loading and disable button
+            loading.style.display = 'block';
+            loginButton.disabled = true;
+            
+            const email = emailInput.value;
+            const password = passwordInput.value;
+
+            try {
+                // Direct API call first to debug
+                console.log('Attempting login with:', { email });
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+                console.log('Login response:', data);
+
+                if (response.ok && data.token) {
+                    // Store token manually first
+                    localStorage.setItem('token', data.token);
+                    showSuccess('Login successful! Redirecting...');
+                    
+                    // Add delay then redirect
+                    setTimeout(() => {
+                        console.log('Redirecting to dashboard...');
+                        window.location.href = '/';
+                    }, 1000);
+                } else {
+                    // Handle login failure with better UX
+                    if (data.message === 'Invalid email or password') {
+                        showError('The email or password you entered is incorrect.');
+                        
+                        // Add helpful options
+                        const optionsDiv = document.createElement('div');
+                        optionsDiv.innerHTML = `
+                            <div style="margin-top: 10px; display: flex; gap: 10px; justify-content: center;">
+                                <a href="/register.html" class="btn-primary" style="display: inline-block; text-decoration: none; text-align: center; flex: 1;">Create Account</a>
+                                <a href="/forgot-password.html" class="btn-primary" style="display: inline-block; text-decoration: none; text-align: center; flex: 1;">Forgot Password</a>
+                            </div>
+                        `;
+                        errorMessage.appendChild(optionsDiv);
+                        
+                        // During development only - add check users option
+                        const devOptions = document.createElement('div');
+                        devOptions.innerHTML = '<div style="margin-top: 10px; font-size: 0.8em; text-align: center;"><a href="#" id="checkUsers">Check Users (Development Only)</a></div>';
+                        errorMessage.appendChild(devOptions);
+                        
+                        document.getElementById('checkUsers').addEventListener('click', async (e) => {
+                            e.preventDefault();
+                            try {
+                                const usersResponse = await fetch('/api/auth/check-users');
+                                const usersData = await usersResponse.json();
+                                if (usersResponse.ok && usersData.users.length > 0) {
+                                    const usersList = usersData.users.map(u => `${u.email} (${u.name})`).join('<br>');
+                                    showSuccess(`Existing users:<br>${usersList}`);
+                                } else {
+                                    showSuccess('No users found in database. Please register first.');
+                                }
+                            } catch (error) {
+                                console.error('Check users error:', error);
+                                showError('Error checking users');
+                            }
+                        });
+                    } else {
+                        showError(data.message || 'Invalid email or password');
+                    }
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                showError('An error occurred. Please try again.');
+            }
+        });
+    </script>
+</body>
+</html> 

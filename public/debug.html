@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Page - AI Finance Tracker</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            margin: 20px;
+            padding: 0;
+            color: #333;
+        }
+        h1 {
+            color: #2c5282;
+            margin-bottom: 20px;
+        }
+        .debug-section {
+            margin-bottom: 30px;
+            padding: 15px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background-color: #f7fafc;
+        }
+        .debug-section h2 {
+            margin-top: 0;
+            color: #4a5568;
+        }
+        pre {
+            background-color: #1a202c;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .btn {
+            padding: 8px 16px;
+            background-color: #4299e1;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        .btn:hover {
+            background-color: #3182ce;
+        }
+        .status {
+            font-weight: bold;
+        }
+        .status.success {
+            color: #38a169;
+        }
+        .status.error {
+            color: #e53e3e;
+        }
+    </style>
+</head>
+<body>
+    <h1>AI Finance Tracker - Debug Page</h1>
+    
+    <div class="debug-section">
+        <h2>Token Information</h2>
+        <div id="token-info"></div>
+        <button class="btn" onclick="checkToken()">Check Token</button>
+        <button class="btn" onclick="removeToken()">Remove Token</button>
+    </div>
+    
+    <div class="debug-section">
+        <h2>API Connection Test</h2>
+        <div id="api-status"></div>
+        <button class="btn" onclick="testApiConnection()">Test Connection</button>
+    </div>
+    
+    <div class="debug-section">
+        <h2>User Data</h2>
+        <div id="user-data"></div>
+        <button class="btn" onclick="fetchUserData()">Fetch User Data</button>
+    </div>
+    
+    <div class="debug-section">
+        <h2>Navigation</h2>
+        <button class="btn" onclick="navigateTo('/')">Go to Dashboard</button>
+        <button class="btn" onclick="navigateTo('/login.html')">Go to Login</button>
+        <button class="btn" onclick="navigateTo('/register.html')">Go to Register</button>
+    </div>
+    
+    <script>
+        // Check token in localStorage
+        function checkToken() {
+            const tokenInfo = document.getElementById('token-info');
+            const token = localStorage.getItem('token');
+            
+            if (token) {
+                // Parse the token parts
+                try {
+                    const parts = token.split('.');
+                    if (parts.length === 3) {
+                        const header = JSON.parse(atob(parts[0]));
+                        const payload = JSON.parse(atob(parts[1]));
+                        
+                        // Calculate expiration
+                        const expDate = new Date(payload.exp * 1000);
+                        const now = new Date();
+                        const isExpired = now > expDate;
+                        
+                        tokenInfo.innerHTML = `
+                            <p class="status ${isExpired ? 'error' : 'success'}">
+                                Token is ${isExpired ? 'expired' : 'valid'}
+                            </p>
+                            <p><strong>User ID:</strong> ${payload.userId}</p>
+                            <p><strong>Expires:</strong> ${expDate.toString()}</p>
+                            <pre>${JSON.stringify({header, payload}, null, 2)}</pre>
+                            <p><strong>Raw Token:</strong></p>
+                            <pre>${token}</pre>
+                        `;
+                    } else {
+                        tokenInfo.innerHTML = `
+                            <p class="status error">Token is malformed (doesn't have 3 parts)</p>
+                            <pre>${token}</pre>
+                        `;
+                    }
+                } catch (e) {
+                    tokenInfo.innerHTML = `
+                        <p class="status error">Error parsing token: ${e.message}</p>
+                        <pre>${token}</pre>
+                    `;
+                }
+            } else {
+                tokenInfo.innerHTML = `
+                    <p class="status error">No token found in localStorage</p>
+                `;
+            }
+        }
+        
+        // Remove token from localStorage
+        function removeToken() {
+            localStorage.removeItem('token');
+            checkToken();
+        }
+        
+        // Test API connection
+        async function testApiConnection() {
+            const apiStatus = document.getElementById('api-status');
+            apiStatus.innerHTML = '<p>Testing connection...</p>';
+            
+            try {
+                const response = await fetch('/api/auth/check-users');
+                const status = response.status;
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    apiStatus.innerHTML = `
+                        <p class="status success">API connection successful (${status})</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    apiStatus.innerHTML = `
+                        <p class="status error">API connection failed with status: ${status}</p>
+                    `;
+                }
+            } catch (error) {
+                apiStatus.innerHTML = `
+                    <p class="status error">API connection error: ${error.message}</p>
+                `;
+            }
+        }
+        
+        // Fetch user data with token
+        async function fetchUserData() {
+            const userData = document.getElementById('user-data');
+            const token = localStorage.getItem('token');
+            
+            if (!token) {
+                userData.innerHTML = `
+                    <p class="status error">No token available. Please log in first.</p>
+                `;
+                return;
+            }
+            
+            userData.innerHTML = '<p>Fetching user data...</p>';
+            
+            try {
+                const response = await fetch('/api/auth/me', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                const status = response.status;
+                const responseText = await response.text();
+                
+                try {
+                    // Try to parse as JSON
+                    const data = JSON.parse(responseText);
+                    
+                    if (response.ok) {
+                        userData.innerHTML = `
+                            <p class="status success">User data retrieved successfully (${status})</p>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        `;
+                    } else {
+                        userData.innerHTML = `
+                            <p class="status error">Failed to get user data: ${status}</p>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        `;
+                    }
+                } catch (e) {
+                    // Not JSON
+                    userData.innerHTML = `
+                        <p class="status error">Response is not valid JSON: ${status}</p>
+                        <pre>${responseText}</pre>
+                    `;
+                }
+            } catch (error) {
+                userData.innerHTML = `
+                    <p class="status error">Error fetching user data: ${error.message}</p>
+                `;
+            }
+        }
+        
+        // Navigate to a page
+        function navigateTo(path) {
+            window.location.href = path;
+        }
+        
+        // Run checks on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            checkToken();
+        });
+    </script>
+</body>
+</html> 

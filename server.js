@@ -4,20 +4,15 @@ const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const path = require('path');
-const db = require('./server/config/database');
-const config = require('./server/config/config');
-const authRoutes = require('./server/routes/auth');
+const db = require('./db/database');
+const authRoutes = require('./routes/auth');
 const transactionRoutes = require('./server/routes/transactions');
 const budgetRoutes = require('./server/routes/budgets');
 const goalRoutes = require('./server/routes/goals');
-const aiRoutes = require('./server/routes/ai');
 const dashboardRoutes = require('./server/routes/dashboard');
+const aiRoutes = require('./server/routes/ai');
 const syncRoutes = require('./server/routes/sync');
-const { authenticateToken } = require('./server/middleware/auth');
-const jwt = require('jsonwebtoken');
-
-// Set JWT secret in process.env
-process.env.JWT_SECRET = config.jwt.secret;
+const authMiddleware = require('./middleware/auth');
 
 const app = express();
 
@@ -27,7 +22,7 @@ app.use(helmet({
         directives: {
             defaultSrc: ["'self'"],
             imgSrc: ["'self'", "data:", "https:", "blob:", "*"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com", "https://cdn.jsdelivr.net"],
             styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
             fontSrc: ["'self'", "https://cdnjs.cloudflare.com"],
         },
@@ -50,26 +45,22 @@ app.use((req, res, next) => {
     next();
 });
 
-// API Routes first
-app.use('/api/auth', authRoutes);
-app.use('/api/transactions', authenticateToken, transactionRoutes);
-app.use('/api/budgets', authenticateToken, budgetRoutes);
-app.use('/api/goals', authenticateToken, goalRoutes);
-app.use('/api/ai', authenticateToken, aiRoutes);
-app.use('/api/dashboard', authenticateToken, dashboardRoutes);
-app.use('/api/sync', authenticateToken, syncRoutes);
-
-// Serve static files for login and register pages
+// Serve static files
+app.use(express.static(path.join(__dirname, 'public')));
 app.use('/css', express.static(path.join(__dirname, 'public/css')));
 app.use('/js', express.static(path.join(__dirname, 'public/js')));
-app.use('/images', express.static(path.join(__dirname, 'public/images'), {
-    setHeaders: (res, path) => {
-        res.set('Content-Type', 'image/png');
-        res.set('Cache-Control', 'no-cache');
-    }
-}));
+app.use('/images', express.static(path.join(__dirname, 'public/images')));
 
-// Login and Register routes
+// API Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/transactions', authMiddleware, transactionRoutes);
+app.use('/api/budgets', authMiddleware, budgetRoutes);
+app.use('/api/goals', authMiddleware, goalRoutes);
+app.use('/api/dashboard', authMiddleware, dashboardRoutes);
+app.use('/api/ai', authMiddleware, aiRoutes);
+app.use('/api/sync', authMiddleware, syncRoutes);
+
+// Auth pages routes (no auth required)
 app.get('/login', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
@@ -78,61 +69,29 @@ app.get('/register', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'register.html'));
 });
 
+app.get('/forgot-password', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'forgot-password.html'));
+});
+
 // Main route handler
 app.get('/', (req, res) => {
-    // Always redirect to login page if no valid token
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) {
-        res.redirect('/login');
-    } else {
-        try {
-            jwt.verify(token, process.env.JWT_SECRET);
-            res.sendFile(path.join(__dirname, 'public', 'index.html'));
-        } catch (err) {
-            res.redirect('/login');
-        }
-    }
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
-
-// Catch-all route for other pages
-app.get('*', (req, res) => {
-    // Don't serve index.html for API routes
-    if (req.url.startsWith('/api/')) {
-        return res.status(404).json({
-            status: 'error',
-            message: 'API endpoint not found'
-        });
-    }
-
-    // For all other routes, check if user is authenticated
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) {
-        res.redirect('/login');
-    } else {
-        try {
-            jwt.verify(token, process.env.JWT_SECRET);
-            res.sendFile(path.join(__dirname, 'public', 'index.html'));
-        } catch (err) {
-            res.redirect('/login');
-        }
-    }
-});
-
-// Serve remaining static files last
-app.use(express.static(path.join(__dirname, 'public')));
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({
-    status: 'error',
-    message: 'Something went wrong!',
-    error: process.env.NODE_ENV === 'development' ? err.message : undefined
-  });
+    console.error(err.stack);
+    res.status(500).json({ message: 'Something went wrong!' });
+});
+
+// 404 handler
+app.use((req, res) => {
+    res.status(404).json({ message: 'Not found' });
 });
 
 // Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+    console.log(`Server is running on port ${PORT}`);
+    console.log(`Connected to SQLite database at: ${path.join(__dirname, 'data', 'finance_tracker.db')}`);
 }); 
