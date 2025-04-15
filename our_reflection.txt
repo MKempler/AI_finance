@@ -1,0 +1,31 @@
+Christian Rivera, Max Kempler 
+Lab 2 Reflection
+
+  AI played a critical role in the development of our financial app, greatly simplifying both the backend and frontend creation processes. 
+From the very beginning, AI tools helped us rapidly structure and generate working code for the application’s infrastructure. 
+This included setting up key systems like Authentication, Transactions, Budgets, and Goals. Using just one comprehensive prompt, followed by a few smaller corrections, 
+we were able to complete essential backend functionality efficiently. The AI provided quick solutions for common issues and wrote clean code for CRUD operations 
+GET, POST, PUT, and DELETE across the four main sections of the app being the transactions, budgets, goals and insights, ensuring a seamless user experience.
+
+  Another major area where AI helped was in our integration of SQLite, which we had never used before. 
+Thanks to Cursor, we were able to get step-by-step guidance on installing, setting up, and implementing SQLite into our backend. 
+Initially, we faced multiple errors and confusion during the setup process, but through consistent prompting and feedback, Cursor helped us 
+resolve those issues and gain a solid understanding of how SQLite works in practice. It was especially helpful in explaining SQL queries and 
+the best practices for handling and storing user data. 
+
+  On the frontend side, AI continued to be a valuable asset. After the backend was completed by one team member, the other took over the frontend, 
+and AI played a key role in bridging the two parts of the application. It helped connect the backend APIs to the frontend and ensured that data 
+was correctly displayed and updated on the user interface. We made use of design-focused prompts to enhance the appearance of the app. 
+At times, when we had trouble explaining a specific issue in words, we uploaded screenshots and used them to show the AI what we needed fixed or improved. 
+This method was incredibly effective in getting visually pleasing and user-friendly results.
+
+  We also implemented basic offline functionality into the app, allowing users to access their data even without an internet connection. 
+AI helped guide us through how to store local data and sync it once the device is back online. This added a layer of usability that we were able to implement into our application.
+
+  Looking ahead, we plan to integrate a AI module directly into the app. This feature will analyze user spending patterns and offer 
+personalized budgeting tips and financial suggestions. While we haven’t fully built this out yet, the groundwork was laid by prompting the 
+AI with a meta prompt. The AI generated a solid outline and even placeholder code, which we’ll build on in future iterations.
+
+Overall, AI significantly improved our collaboration and productivity. One of use were able to focus on the backend and the 
+other person the frontend while using AI to fill knowledge gaps, fix bugs, and connect both sides of the app. The AI served as a 
+silent team member, always ready to help with advice, solutions, or even full code snippets, making the entire development process more efficient and enjoyable.
