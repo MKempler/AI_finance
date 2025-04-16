@@ -79,7 +79,8 @@ const auth = {
     // Handle logout
     logout() {
         this.removeToken();
-        window.location.href = '/login.html';
+        localStorage.removeItem('user'); // Also remove user data
+        window.location.href = 'login.html';
     },
 
     // Get current user data

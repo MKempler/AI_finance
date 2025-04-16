@@ -2,6 +2,7 @@
 
 // Initialize dashboard when the page loads
 document.addEventListener('DOMContentLoaded', function() {
+    initializeUserData();
     initializeDashboard();
     initializeCharts();
     bindEvents();
@@ -12,7 +13,24 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeInsights();
     // Comment out this line since the function doesn't exist yet
     // initializeSettings();
+    setupCSVImportModal();
 });
+
+// Initialize user data if it doesn't exist
+function initializeUserData() {
+    if (!localStorage.getItem('user')) {
+        // Create default user data
+        const defaultUser = {
+            firstName: 'Testing',
+            lastName: 'User',
+            email: 'testing@example.com',
+            phone: '+1 (555) 123-4567'
+        };
+        
+        // Save to localStorage
+        localStorage.setItem('user', JSON.stringify(defaultUser));
+    }
+}
 
 // Initialize dashboard components
 function initializeDashboard() {
@@ -44,6 +62,16 @@ function bindEvents() {
             switchTab(targetId);
         });
     });
+    
+    // Logout button
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            auth.logout();
+            return false;
+        });
+    }
     
     // Period selectors for charts
     const periodButtons = document.querySelectorAll('.period');
@@ -209,40 +237,40 @@ function loadScript(url, callback) {
 
 // Populate user greeting and dashboard data
 function populateUserGreeting() {
-    // Check if user data is available
-    auth.getCurrentUser()
-        .then(response => {
-            if (response.success && response.user) {
-                // Update user greeting
-                const userGreeting = document.getElementById('user-greeting');
-                if (userGreeting) {
-                    userGreeting.textContent = response.user.name;
-                }
-                
-                // Update user info in sidebar
-                const userNameElement = document.querySelector('.user-name');
-                if (userNameElement) {
-                    userNameElement.textContent = response.user.name;
-                }
-                
-                const userEmailElement = document.querySelector('.user-email');
-                if (userEmailElement && response.user.email) {
-                    userEmailElement.textContent = response.user.email;
-                }
-                
-                // Update user avatar
-                const userAvatar = document.querySelector('.user-avatar');
-                if (userAvatar) {
-                    userAvatar.textContent = response.user.name.charAt(0).toUpperCase();
-                }
-
-                // Load dashboard data
-                loadDashboardData();
-            }
-        })
-        .catch(error => {
-            console.error('Error fetching user data:', error);
-        });
+    // Get user data
+    const userString = localStorage.getItem('user');
+    let userData = {
+        firstName: 'User'
+    };
+    
+    if (userString) {
+        try {
+            userData = JSON.parse(userString);
+        } catch (e) {
+            console.error('Error parsing user data:', e);
+        }
+    }
+    
+    // Update user greeting
+    const userGreetingElements = document.querySelectorAll('#userName, #user-greeting');
+    userGreetingElements.forEach(element => {
+        if (element) {
+            element.textContent = userData.firstName;
+        }
+    });
+    
+    // Update user name in header
+    const userNameElement = document.getElementById('user-name');
+    if (userNameElement) {
+        userNameElement.textContent = userData.firstName;
+    }
+    
+    // Update user avatar
+    const userAvatarElement = document.getElementById('user-avatar');
+    if (userAvatarElement) {
+        const firstLetter = userData.firstName.charAt(0).toUpperCase();
+        userAvatarElement.textContent = firstLetter;
+    }
 }
 
 // Load dashboard data from API
@@ -1060,59 +1088,27 @@ function updateCategoryOptions() {
 }
 
 // Show notification
-function showNotification(message, type = 'info') {
-    // Create notification element if it doesn't exist
-    let notification = document.getElementById('notification');
-    if (!notification) {
-        notification = document.createElement('div');
-        notification.id = 'notification';
-        document.body.appendChild(notification);
-        
-        // Add styles
-        const style = document.createElement('style');
-        style.textContent = `
-            #notification {
-                position: fixed;
-                top: 1rem;
-                right: 1rem;
-                padding: 1rem;
-                border-radius: 0.5rem;
-                color: white;
-                font-weight: 500;
-                z-index: 1000;
-                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-                animation: fadeIn 0.3s, fadeOut 0.3s 2.7s;
-                max-width: 300px;
-            }
-            
-            @keyframes fadeIn {
-                from { opacity: 0; transform: translateY(-20px); }
-                to { opacity: 1; transform: translateY(0); }
-            }
-            
-            @keyframes fadeOut {
-                from { opacity: 1; transform: translateY(0); }
-                to { opacity: 0; transform: translateY(-20px); }
-            }
-            
-            .notification-success { background-color: var(--success-color); }
-            .notification-error { background-color: var(--danger-color); }
-            .notification-info { background-color: var(--primary-color); }
-        `;
-        document.head.appendChild(style);
-    }
-    
-    // Set notification type and message
-    notification.className = `notification-${type}`;
+function showNotification(message, type = 'success') {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
     notification.textContent = message;
     
-    // Show notification
-    notification.style.display = 'block';
+    // Add to DOM
+    document.body.appendChild(notification);
     
-    // Hide after 3 seconds
+    // Trigger animation
     setTimeout(() => {
-        notification.style.display = 'none';
-    }, 3000);
+        notification.classList.add('show');
+    }, 10);
+    
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+        notification.classList.remove('show');
+        setTimeout(() => {
+            document.body.removeChild(notification);
+        }, 300);
+    }, 5000);
 }
 
 // Helper function to format date as YYYY-MM-DD
@@ -3243,4 +3239,190 @@ function formatDate(date) {
         month: 'short',
         day: 'numeric'
     });
-} 
+}
+
+// CSV Import Modal functionality
+function setupCSVImportModal() {
+    const openModalBtn = document.getElementById('import-csv-btn');
+    const csvModal = document.getElementById('csv-import-modal');
+    const closeModalBtn = document.querySelector('.close-modal');
+    const cancelBtn = document.getElementById('cancel-import');
+    const importBtn = document.getElementById('confirm-import');
+    const fileInput = document.getElementById('csv-file-input');
+    const uploadArea = document.querySelector('.csv-upload-area');
+    const selectedFileName = document.getElementById('selected-file-name');
+    
+    // Show the modal when Import CSV button is clicked
+    if (openModalBtn) {
+        openModalBtn.addEventListener('click', () => {
+            csvModal.style.display = 'flex';
+        });
+    }
+    
+    // Hide the modal
+    function closeModal() {
+        csvModal.style.display = 'none';
+        fileInput.value = '';
+        selectedFileName.textContent = 'No file selected';
+    }
+    
+    // Close modal when clicking the close button
+    if (closeModalBtn) {
+        closeModalBtn.addEventListener('click', closeModal);
+    }
+    
+    // Close modal when clicking cancel button
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', closeModal);
+    }
+    
+    // Handle file selection
+    if (fileInput) {
+        fileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                selectedFileName.textContent = file.name;
+            } else {
+                selectedFileName.textContent = 'No file selected';
+            }
+        });
+    }
+    
+    // Make the upload area clickable to trigger file input
+    if (uploadArea) {
+        uploadArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+    }
+    
+    // Handle drag and drop
+    if (uploadArea) {
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('drag-over');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('drag-over');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('drag-over');
+            
+            if (e.dataTransfer.files.length) {
+                fileInput.files = e.dataTransfer.files;
+                const file = e.dataTransfer.files[0];
+                if (file) {
+                    selectedFileName.textContent = file.name;
+                }
+            }
+        });
+    }
+    
+    // Handle import button click
+    if (importBtn) {
+        importBtn.addEventListener('click', () => {
+            if (fileInput.files.length === 0) {
+                alert('Please select a CSV file first');
+                return;
+            }
+            
+            const file = fileInput.files[0];
+            if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
+                alert('Please select a valid CSV file');
+                return;
+            }
+            
+            processCSVFile(file);
+            closeModal();
+        });
+    }
+}
+
+// Process the uploaded CSV file
+function processCSVFile(file) {
+    const reader = new FileReader();
+    
+    reader.onload = function(e) {
+        const contents = e.target.result;
+        const transactions = parseCSV(contents);
+        saveTransactions(transactions);
+        updateDashboardWithNewTransactions();
+    };
+    
+    reader.onerror = function() {
+        alert('Error reading the CSV file');
+    };
+    
+    reader.readAsText(file);
+}
+
+// Parse CSV string into array of transaction objects
+function parseCSV(csvString) {
+    const lines = csvString.split('\n');
+    const transactions = [];
+    
+    // Skip header line
+    for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        
+        const values = line.split(',');
+        if (values.length < 4) continue;
+        
+        const transaction = {
+            date: values[0],
+            description: values[1],
+            amount: parseFloat(values[2]),
+            category: values[3],
+            type: parseFloat(values[2]) >= 0 ? 'income' : 'expense'
+        };
+        
+        transactions.push(transaction);
+    }
+    
+    return transactions;
+}
+
+// Save transactions to localStorage
+function saveTransactions(newTransactions) {
+    let existingTransactions = [];
+    const storedTransactions = localStorage.getItem('transactions');
+    
+    if (storedTransactions) {
+        existingTransactions = JSON.parse(storedTransactions);
+    }
+    
+    // Combine existing and new transactions
+    const updatedTransactions = [...existingTransactions, ...newTransactions];
+    
+    // Sort transactions by date (newest first)
+    updatedTransactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+    
+    localStorage.setItem('transactions', JSON.stringify(updatedTransactions));
+}
+
+// Update dashboard with new transaction data
+function updateDashboardWithNewTransactions() {
+    // Refresh transaction list
+    const transactionList = document.querySelector('.transactions-list');
+    if (transactionList) {
+        populateTransactionsList();
+    }
+    
+    // Refresh charts
+    updateChartData();
+    
+    // Update summary cards
+    updateFinancialSummary();
+    
+    // Show success notification
+    showNotification('Transactions imported successfully!', 'success');
+}
+
+// Initialize CSV Import
+document.addEventListener('DOMContentLoaded', function() {
+    // ... existing code ...
+    setupCSVImportModal();
+}); 
