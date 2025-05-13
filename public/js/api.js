@@ -308,6 +308,21 @@ const api = {
         }
     },
 
+    async generateInsights() {
+        try {
+            // No body is needed for the POST request yet, as the backend will use the authenticated user ID
+            // Later, we might pass specific parameters if needed (e.g., date range, specific areas of focus)
+            const response = await fetch('/api/ai/generate-insights', {
+                method: 'POST', // Important: This is a POST request
+                headers: this.getHeaders()
+            });
+            return this.handleResponse(response);
+        } catch (error) {
+            console.error('Error generating AI insights:', error);
+            throw error;
+        }
+    },
+
     // Sync
     async syncTransactions(transactions) {
         try {
@@ -360,6 +375,18 @@ const api = {
             return this.handleResponse(response);
         } catch (error) {
             console.error('Error updating password:', error);
+            throw error;
+        }
+    },
+
+    async getStoredInsights() {
+        try {
+            const response = await fetch('/api/ai/insights', { // GET request
+                headers: this.getHeaders()
+            });
+            return this.handleResponse(response);
+        } catch (error) {
+            console.error('Error fetching stored AI insights:', error);
             throw error;
         }
     }

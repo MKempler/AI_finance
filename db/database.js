@@ -179,13 +179,33 @@ function initializeDatabase() {
                                     }
                                     console.log('Goal contributions table created/verified');
                                     
-                                    // Now resolve after all tables are potentially created
-                                    checkDatabaseSchema()
-                                        .then(() => {
-                                            console.log('Database tables initialized successfully');
-                                            resolve();
-                                        })
-                                        .catch(reject);
+                                    // Create insights table
+                                    db.run(`
+                                        CREATE TABLE IF NOT EXISTS insights (
+                                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                            user_id INTEGER NOT NULL,
+                                            title TEXT NOT NULL,
+                                            content TEXT NOT NULL,
+                                            type TEXT NOT NULL, -- e.g., spending, saving, budget, goal, warning, tip
+                                            generated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                                        )
+                                    `, (err) => {
+                                        if (err) {
+                                            console.error('Error creating insights table:', err);
+                                            reject(err);
+                                            return;
+                                        }
+                                        console.log('Insights table created/verified');
+
+                                        // Now resolve after all tables are potentially created
+                                        checkDatabaseSchema()
+                                            .then(() => {
+                                                console.log('Database tables initialized successfully');
+                                                resolve();
+                                            })
+                                            .catch(reject);
+                                    });
                                 });
                             });
                         });

@@ -358,6 +358,57 @@
                 margin-left: 60px;
             }
         }
+
+        .styled-period-selector {
+            margin-bottom: 18px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .period-btn {
+            background: #f3f4f6;
+            color: #1e3a8a;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            padding: 6px 18px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s, border 0.15s;
+        }
+        .period-btn.active, .period-btn:focus {
+            background: #1e3a8a;
+            color: #fff;
+            border: 1.5px solid #1e3a8a;
+            outline: none;
+        }
+        .active-range-label {
+            margin-left: 24px;
+            font-weight: 600;
+            color: #1e3a8a;
+            font-size: 1.08rem;
+            letter-spacing: 0.01em;
+        }
+        .transactions-filters.filters-active {
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 10px;
+            background: #f8fafc;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .spending-chart {
+            position: relative; /* Important for canvas child positioning */
+            height: 280px; /* Or your desired fixed height */
+            width: 100%; /* Ensure it takes available width */
+        }
+
+        #spendingChart {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100% !important; /* Override any inline styles */
+            height: 100% !important; /* Override any inline styles */
+        }
     </style>
 </head>
 <body>
@@ -433,7 +484,7 @@
                 
                 <!-- Financial Summary Section -->
                 <div class="dashboard-section">
-                    <div class="section-title">
+                    <div class="section-title" id="financial-summary-title">
                         <i class="fas fa-chart-pie"></i> Financial Summary
                     </div>
                     
@@ -498,7 +549,7 @@
                                 </div>
                             </div>
                             <div class="spending-chart">
-                                <canvas id="spendingChart" height="250"></canvas>
+                                <canvas id="spendingChart"></canvas>
                             </div>
                         </div>
                     </div>
@@ -519,79 +570,6 @@
                         </div>
                     </div>
                 </div>
-
-                <!-- AI Insights Section -->
-                <div class="dashboard-section insights-section">
-                    <div class="section-title">
-                        <i class="fas fa-robot"></i> AI-Powered Insights
-                        <button id="refresh-insights-btn" class="refresh-insights">
-                            <i class="fas fa-sync-alt"></i>
-                        </button>
-                    </div>
-                    
-                    <div class="insights-container">
-                        <div class="insight-card">
-                            <div class="insight-header">
-                                <div class="insight-icon saving">
-                                    <i class="fas fa-piggy-bank"></i>
-                                </div>
-                                <h3>Saving Opportunity</h3>
-                            </div>
-                            <div class="insight-content">
-                                <p>You spent $120 on subscription services this month. Consider reviewing your subscriptions to identify services you rarely use.</p>
-                                <div class="insight-actions">
-                                    <button class="view-details-btn">View Details</button>
-                                    <div class="insight-date">May 15, 2023</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="insight-card">
-                            <div class="insight-header">
-                                <div class="insight-icon warning">
-                                    <i class="fas fa-exclamation-triangle"></i>
-                                </div>
-                                <h3>Budget Alert</h3>
-                            </div>
-                            <div class="insight-content">
-                                <p>Your dining out expenses are 35% higher than last month and you've reached 90% of your monthly budget.</p>
-                                <div class="insight-actions">
-                                    <button class="view-details-btn">View Details</button>
-                                    <div class="insight-date">May 14, 2023</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="insight-card">
-                            <div class="insight-header">
-                                <div class="insight-icon goal">
-                                    <i class="fas fa-bullseye"></i>
-                                </div>
-                                <h3>Goal Progress</h3>
-                            </div>
-                            <div class="insight-content">
-                                <p>At your current saving rate, you'll reach your "New Car" goal 2 months earlier than planned. Great work!</p>
-                                <div class="insight-actions">
-                                    <button class="view-details-btn">View Details</button>
-                                    <div class="insight-date">May 12, 2023</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="insight-card">
-                            <div class="insight-header">
-                                <div class="insight-icon tip">
-                                    <i class="fas fa-lightbulb"></i>
-                                </div>
-                                <h3>Smart Tip</h3>
-                            </div>
-                            <div class="insight-content">
-                                <p>Based on your spending patterns, switching to an annual payment for your streaming services could save you $45 per year.</p>
-                                <div class="insight-actions">
-                                    <button class="view-details-btn">View Details</button>
-                                    <div class="insight-date">May 10, 2023</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             <!-- Transactions Tab -->
@@ -601,27 +579,41 @@
                     <p class="subtitle">Manage your income and expenses</p>
                 </div>
                 
-                <div class="transactions-actions">
+                <!-- Quick Period Buttons & Active Range -->
+                <div class="transactions-period-selector styled-period-selector">
+                    <button class="period-btn" data-period="week">Week</button>
+                    <button class="period-btn active" data-period="month">Month</button>
+                    <button class="period-btn" data-period="year">Year</button>
+                    <button class="period-btn" data-period="all">All</button>
+                    <span id="transactions-active-range" class="active-range-label"></span>
+                </div>
+                
+                <!-- Main Actions & Filters -->
+                <div class="transactions-actions" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <button class="btn-primary" id="add-transaction-btn">
                         <i class="fas fa-plus"></i> Add Transaction
                     </button>
-                    <button class="btn-secondary" id="import-csv-btn">
-                        <i class="fas fa-file-csv"></i> Import CSV
-                    </button>
-                    <div class="transactions-filters">
+                    
+                    <div class="transactions-filters" style="display: flex; gap: 15px; align-items: center;">
+                        <!-- Hidden date inputs, controlled by period buttons -->
+                        <input type="date" class="date-input" id="date-from" placeholder="From" style="display: none;">
+                        <input type="date" class="date-input" id="date-to" placeholder="To" style="display: none;">
+
                         <div class="filter-group">
-                            <label>Date Range</label>
-                            <div class="date-range">
-                                <input type="date" class="date-input" id="date-from" placeholder="From">
-                                <span class="date-separator">to</span>
-                                <input type="date" class="date-input" id="date-to" placeholder="To">
-                            </div>
+                            <label style="margin-right: 5px;">Type</label>
+                            <select class="filter-select" id="type-filter">
+                                <option value="">All Types</option>
+                                <option value="income">Income</option>
+                                <option value="expense">Expense</option>
+                            </select>
                         </div>
                         <div class="filter-group">
-                            <label>Category</label>
+                            <label style="margin-right: 5px;">Category</label>
                             <select class="filter-select" id="category-filter">
                                 <option value="">All Categories</option>
                                 <option value="income">Income</option>
+                                <option value="salary">Salary</option>
+                                <option value="investment">Investment</option>
                                 <option value="groceries">Groceries</option>
                                 <option value="dining">Dining Out</option>
                                 <option value="transportation">Transportation</option>
@@ -629,20 +621,17 @@
                                 <option value="utilities">Utilities</option>
                                 <option value="shopping">Shopping</option>
                                 <option value="health">Health</option>
+                                <option value="housing">Housing</option>
+                                <option value="savings">Savings</option>
+                                <option value="travel">Travel</option>
+                                <option value="education">Education</option>
                                 <option value="other">Other</option>
-                            </select>
-                        </div>
-                        <div class="filter-group">
-                            <label>Type</label>
-                            <select class="filter-select" id="type-filter">
-                                <option value="">All Types</option>
-                                <option value="income">Income</option>
-                                <option value="expense">Expense</option>
                             </select>
                         </div>
                         <button class="btn-filter" id="apply-filters">
                             <i class="fas fa-filter"></i> Apply Filters
                         </button>
+                        <button class="btn-secondary" id="clear-filters">Clear Filters</button>
                     </div>
                 </div>
                 
@@ -691,20 +680,6 @@
                       <!-- Transactions will be dynamically loaded here -->
                     </tbody>
                   </table>
-                </div>
-                
-                <div class="transactions-pagination">
-                    <button class="pagination-btn" disabled>
-                        <i class="fas fa-chevron-left"></i>
-                    </button>
-                    <div class="pagination-pages">
-                        <button class="pagination-page active">1</button>
-                        <button class="pagination-page">2</button>
-                        <button class="pagination-page">3</button>
-                    </div>
-                    <button class="pagination-btn">
-                        <i class="fas fa-chevron-right"></i>
-                    </button>
                 </div>
             </div>
 
@@ -962,34 +937,8 @@
                     <div class="budget-header">
                         <h3>Budget Insights</h3>
                     </div>
-                    <div class="insights-grid">
-                        <div class="insight-card">
-                            <div class="insight-icon warning">
-                                <i class="fas fa-exclamation-triangle"></i>
-                            </div>
-                            <div class="insight-content">
-                                <h4>Over Budget Categories</h4>
-                                <p>You've exceeded your budget in <strong>Dining Out</strong> and <strong>Entertainment</strong>. Consider adjusting your spending or increasing these budgets.</p>
-                            </div>
-                        </div>
-                        <div class="insight-card">
-                            <div class="insight-icon saving">
-                                <i class="fas fa-piggy-bank"></i>
-                            </div>
-                            <div class="insight-content">
-                                <h4>Potential Savings</h4>
-                                <p>You still have <strong>$126</strong> left in your Utilities budget. Keep up the good work to stay under budget!</p>
-                            </div>
-                        </div>
-                        <div class="insight-card">
-                            <div class="insight-icon tip">
-                                <i class="fas fa-lightbulb"></i>
-                            </div>
-                            <div class="insight-content">
-                                <h4>Budget Tip</h4>
-                                <p>Consider using the <strong>$200</strong> remaining in your Health & Wellness budget for preventative care or a gym membership.</p>
-                            </div>
-                        </div>
+                    <div class="insights-content" id="budget-insights-container">
+                        <!-- Dynamic budget insights will be loaded here -->
                     </div>
                 </div>
             </div>
@@ -1051,43 +1000,8 @@
                         <div class="insights-header">
                             <h3>Goal Insights</h3>
                         </div>
-                        <div class="insights-content">
-                            <div class="insight-card">
-                                <div class="insight-icon progress">
-                                    <i class="fas fa-chart-line"></i>
-                                </div>
-                                <div class="insight-content">
-                                    <h4>On Track</h4>
-                                    <p>Your Emergency Fund is on track to meet your target date.</p>
-                                </div>
-                            </div>
-                            <div class="insight-card">
-                                <div class="insight-icon warning">
-                                    <i class="fas fa-exclamation-triangle"></i>
-                                </div>
-                                <div class="insight-content">
-                                    <h4>Need More Contributions</h4>
-                                    <p>Your New Car goal is behind schedule. Consider increasing monthly contributions by $150 to stay on track.</p>
-                                </div>
-                            </div>
-                            <div class="insight-card">
-                                <div class="insight-icon tip">
-                                    <i class="fas fa-lightbulb"></i>
-                                </div>
-                                <div class="insight-content">
-                                    <h4>Recommendation</h4>
-                                    <p>Based on your income, you could allocate an additional $300/month to your Home Down Payment goal.</p>
-                                </div>
-                            </div>
-                            <div class="insight-card">
-                                <div class="insight-icon achievement">
-                                    <i class="fas fa-trophy"></i>
-                                </div>
-                                <div class="insight-content">
-                                    <h4>Goal Achieved!</h4>
-                                    <p>Congratulations on completing your Vacation Fund goal ahead of schedule!</p>
-                                </div>
-                            </div>
+                        <div class="insights-content" id="goal-insights-container">
+                            <!-- Dynamic goal insights will be loaded here -->
                         </div>
                     </div>
                 </div>
@@ -1114,144 +1028,18 @@
                 </div>
                 
                 <div class="insights-container">
-                    <!-- Spending Insights -->
-                    <div class="insight-card" data-type="spending">
-                        <div class="insight-header">
-                            <div class="insight-icon warning">
-                                <i class="fas fa-chart-pie"></i>
-                            </div>
-                            <h3>Unusual Spending Pattern</h3>
+                    <!-- Remove all hardcoded insight-card divs from here -->
+                    <div class="insights-empty" style="display: block; text-align: center; padding: 40px;">
+                        <div class="empty-icon">
+                            <i class="fas fa-lightbulb fa-2x"></i>
                         </div>
-                        <div class="insight-content">
-                            <p>Your dining expenses have increased by 45% compared to last month. This is significantly higher than your usual spending in this category.</p>
-                            <div class="insight-actions">
-                                <button class="btn-link view-details-btn">View Details</button>
-                                <span class="insight-date">July 25, 2025</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Saving Insights -->
-                    <div class="insight-card" data-type="saving">
-                        <div class="insight-header">
-                            <div class="insight-icon saving">
-                                <i class="fas fa-piggy-bank"></i>
-                            </div>
-                            <h3>Savings Opportunity</h3>
-                        </div>
-                        <div class="insight-content">
-                            <p>Based on your subscription spending, you could save $35 monthly by switching to annual plans for your streaming services. This would result in $420 annual savings.</p>
-                            <div class="insight-actions">
-                                <button class="btn-link view-details-btn">View Details</button>
-                                <span class="insight-date">July 23, 2025</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Budget Insights -->
-                    <div class="insight-card" data-type="budget">
-                        <div class="insight-header">
-                            <div class="insight-icon warning">
-                                <i class="fas fa-exclamation-triangle"></i>
-                            </div>
-                            <h3>Budget Alert</h3>
-                        </div>
-                        <div class="insight-content">
-                            <p>You've reached 90% of your Entertainment budget with 10 days left in the month. Consider adjusting your spending to stay within budget.</p>
-                            <div class="insight-actions">
-                                <button class="btn-link view-details-btn">View Details</button>
-                                <span class="insight-date">July 21, 2025</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Goals Insights -->
-                    <div class="insight-card" data-type="goals">
-                        <div class="insight-header">
-                            <div class="insight-icon goal">
-                                <i class="fas fa-bullseye"></i>
-                            </div>
-                            <h3>Goal Progress</h3>
-                        </div>
-                        <div class="insight-content">
-                            <p>Your Emergency Fund goal is on track! At your current contribution rate, you'll reach your target 2 months ahead of schedule.</p>
-                            <div class="insight-actions">
-                                <button class="btn-link view-details-btn">View Details</button>
-                                <span class="insight-date">July 20, 2025</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Smart Recommendations -->
-                    <div class="insight-card" data-type="saving">
-                        <div class="insight-header">
-                            <div class="insight-icon saving">
-                                <i class="fas fa-lightbulb"></i>
-                            </div>
-                            <h3>Smart Recommendation</h3>
-                        </div>
-                        <div class="insight-content">
-                            <p>You have $2,800 sitting in your checking account earning minimal interest. Consider moving $2,000 to your high-yield savings account to earn 4.5% APY.</p>
-                            <div class="insight-actions">
-                                <button class="btn-link view-details-btn">View Details</button>
-                                <span class="insight-date">July 19, 2025</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Income Insights -->
-                    <div class="insight-card" data-type="spending">
-                        <div class="insight-header">
-                            <div class="insight-icon saving">
-                                <i class="fas fa-chart-line"></i>
-                            </div>
-                            <h3>Income Analysis</h3>
-                        </div>
-                        <div class="insight-content">
-                            <p>Your income has increased by 8% compared to the same quarter last year. Consider allocating the additional income to your Home Down Payment goal.</p>
-                            <div class="insight-actions">
-                                <button class="btn-link view-details-btn">View Details</button>
-                                <span class="insight-date">July 15, 2025</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Tax Insights -->
-                    <div class="insight-card" data-type="saving">
-                        <div class="insight-header">
-                            <div class="insight-icon goal">
-                                <i class="fas fa-file-invoice-dollar"></i>
-                            </div>
-                            <h3>Tax Optimization</h3>
-                        </div>
-                        <div class="insight-content">
-                            <p>You might be eligible for additional tax deductions through retirement contributions. Increasing your 401(k) contribution could save approximately $1,200 in taxes this year.</p>
-                            <div class="insight-actions">
-                                <button class="btn-link view-details-btn">View Details</button>
-                                <span class="insight-date">July 10, 2025</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Credit Score Insights -->
-                    <div class="insight-card" data-type="saving">
-                        <div class="insight-header">
-                            <div class="insight-icon goal">
-                                <i class="fas fa-credit-card"></i>
-                            </div>
-                            <h3>Credit Score Update</h3>
-                        </div>
-                        <div class="insight-content">
-                            <p>Your credit score has improved by 15 points in the last 3 months. You may now qualify for better interest rates on loans and credit cards.</p>
-                            <div class="insight-actions">
-                                <button class="btn-link view-details-btn">View Details</button>
-                                <span class="insight-date">July 5, 2025</span>
-                            </div>
-                        </div>
+                        <h3 style="margin-top: 15px;">No insights loaded</h3>
+                        <p>Click "Refresh Insights" to generate personalized recommendations based on your data.</p>
                     </div>
                 </div>
                 
                 <div class="insights-empty" style="display: none;">
+                    <!-- This one is used by JS for filtering feedback, keep it but ensure it's hidden initially -->
                     <div class="empty-state">
                         <i class="fas fa-search"></i>
                         <h3>No insights found</h3>
@@ -1305,6 +1093,15 @@
                 }
             })
             .catch(error => console.error('Error fetching user info:', error));
+
+            // Set the financial summary title to include the current month and year
+            const summaryTitle = document.getElementById('financial-summary-title');
+            if (summaryTitle) {
+                const now = new Date();
+                const month = now.toLocaleString('default', { month: 'long' });
+                const year = now.getFullYear();
+                summaryTitle.innerHTML = `<i class="fas fa-chart-pie"></i> ${month} ${year} Financial Summary`;
+            }
         });
     </script>
     

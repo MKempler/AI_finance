@@ -27,6 +27,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     window.addEventListener('hashchange', showTabFromHash);
     showTabFromHash();
+    console.log('Root DOMContentLoaded finished.'); // Log 1: End of DOMContentLoaded
 });
 
 // Initialize user data if it doesn't exist
@@ -154,33 +155,49 @@ function initializeCharts() {
 function initializeSpendingChart() {
     const ctx = document.getElementById('spendingChart');
     if (!ctx) return;
-    
-    // Get the Chart.js library
+    // Initialize with empty data
     if (typeof Chart === 'undefined') {
         loadScript('https://cdn.jsdelivr.net/npm/chart.js', () => {
-            renderSpendingChart(ctx);
+            renderSpendingChart(ctx, [], []);
         });
     } else {
-        renderSpendingChart(ctx);
+        renderSpendingChart(ctx, [], []);
     }
 }
 
-// Render spending breakdown chart
-function renderSpendingChart(ctx) {
+// Render spending breakdown chart with dynamic data and fixed colors
+function renderSpendingChart(ctx, labels, data) {
+    // Fixed color palette for common categories
+    const categoryColors = {
+        'groceries': '#10b981',      // Green
+        'dining': '#f59e0b',         // Orange
+        'dining out': '#f59e0b',     // Orange (alt)
+        'savings': '#3b82f6',        // Blue
+        'housing': '#6366f1',        // Indigo
+        'utilities': '#ef4444',      // Red
+        'entertainment': '#8b5cf6',  // Purple
+        'shopping': '#a3e635',       // Light Green
+        'health': '#f43f5e',         // Pink
+        'transportation': '#64748b', // Slate
+        'salary': '#22d3ee',         // Cyan
+        'investment': '#fbbf24',     // Amber
+        'travel': '#0ea5e9',         // Sky
+        'education': '#eab308',      // Yellow
+        'other': '#6b7280',          // Gray
+        'income': '#22d3ee',         // Cyan
+    };
+    const defaultColor = '#d1d5db'; // Light gray for unknowns
+    const backgroundColors = labels.map(label => {
+        const key = label.toLowerCase();
+        return categoryColors[key] || defaultColor;
+    });
     const chart = new Chart(ctx, {
         type: 'doughnut',
         data: {
-            labels: ['Housing', 'Food', 'Transportation', 'Entertainment', 'Utilities', 'Other'],
+            labels: labels,
             datasets: [{
-                data: [35, 25, 15, 10, 10, 5],
-                backgroundColor: [
-                    '#3b82f6', // Housing
-                    '#10b981', // Food
-                    '#f59e0b', // Transportation
-                    '#8b5cf6', // Entertainment
-                    '#ef4444', // Utilities
-                    '#6b7280'  // Other
-                ],
+                data: data,
+                backgroundColor: backgroundColors,
                 borderWidth: 0,
                 hoverOffset: 5
             }]
@@ -204,7 +221,9 @@ function renderSpendingChart(ctx) {
                         label: function(context) {
                             const label = context.label || '';
                             const value = context.raw || 0;
-                            return `${label}: ${value}%`;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percent = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                            return `${label}: $${value.toLocaleString()} (${percent}%)`;
                         }
                     }
                 }
@@ -212,34 +231,62 @@ function renderSpendingChart(ctx) {
             cutout: '70%'
         }
     });
-    
-    // Store the chart instance for later updates
     window.spendingChart = chart;
 }
 
-// Update chart data based on selected period
-function updateChartData(period) {
-    if (!window.spendingChart) return;
-    
-    let newData;
-    
-    switch(period) {
-        case 'week':
-            newData = [30, 35, 10, 15, 5, 5];
-            break;
-        case 'month':
-            newData = [35, 25, 15, 10, 10, 5];
-            break;
-        case 'year':
-            newData = [40, 20, 15, 5, 15, 5];
-            break;
-        default:
-            newData = [35, 25, 15, 10, 10, 5];
+// Update spending chart with real data and period filtering
+function updateSpendingChartFromTransactions(transactions, period = spendingChartPeriod) {
+    // Determine date range based on period
+    const now = new Date();
+    let startDate, endDate;
+    endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    if (period === 'week') {
+        // Start from the most recent Sunday
+        const dayOfWeek = now.getDay();
+        startDate = new Date(now);
+        startDate.setDate(now.getDate() - dayOfWeek);
+        startDate.setHours(0, 0, 0, 0);
+    } else if (period === 'month') {
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    } else if (period === 'year') {
+        startDate = new Date(now.getFullYear(), 0, 1);
+    } else {
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
     }
-    
-    window.spendingChart.data.datasets[0].data = newData;
-    window.spendingChart.update();
-    console.log(`Updated chart data for period: ${period}`);
+    // Only consider expenses in the selected period
+    const categoryTotals = {};
+    transactions.forEach(tx => {
+        const txDate = new Date(tx.date);
+        if (
+            tx.type === 'expense' &&
+            txDate >= startDate &&
+            txDate <= endDate
+        ) {
+            const cat = tx.category || 'Other';
+            categoryTotals[cat] = (categoryTotals[cat] || 0) + Math.abs(parseFloat(tx.amount));
+        }
+    });
+    const labels = Object.keys(categoryTotals);
+    const data = Object.values(categoryTotals);
+    if (window.spendingChart) {
+        // Rebuild the chart with new labels and data for color/legend consistency
+        const ctx = window.spendingChart.ctx;
+        window.spendingChart.destroy();
+        renderSpendingChart(ctx, labels, data);
+    }
+}
+
+// Bind period selector buttons for the spending chart
+function bindSpendingChartPeriodButtons(transactions) {
+    const periodButtons = document.querySelectorAll('.period');
+    periodButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            periodButtons.forEach(btn => btn.classList.remove('active'));
+            this.classList.add('active');
+            spendingChartPeriod = this.textContent.trim().toLowerCase();
+            updateSpendingChartFromTransactions(transactions, spendingChartPeriod);
+        });
+    });
 }
 
 // Load external script
@@ -294,8 +341,9 @@ function loadDashboardData() {
         .then(response => {
             if (response.status === 'success') {
                 updateDashboardStatsFromTransactions(response.data);
-                updateSpendingChartFromTransactions(response.data);
+                updateSpendingChartFromTransactions(response.data, spendingChartPeriod);
                 updateRecentTransactionsFromDashboard(response.data);
+                bindSpendingChartPeriodButtons(response.data); // Bind after data load
             }
         })
         .catch(error => {
@@ -306,42 +354,72 @@ function loadDashboardData() {
 
 // Update dashboard statistics
 function updateDashboardStatsFromTransactions(transactions) {
-    // Calculate totals
-    let income = 0;
-    let expenses = 0;
-    let savings = 0;
+    // Calculate totals for current and previous month
+    let income = 0, prevIncome = 0;
+    let expenses = 0, prevExpenses = 0;
+    let savings = 0, prevSavings = 0;
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+    const prevMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+
     transactions.forEach(transaction => {
-        if (transaction.type === 'income') {
-            income += parseFloat(transaction.amount);
-        } else if (transaction.type === 'expense') {
-            expenses += Math.abs(parseFloat(transaction.amount));
-        } else if (transaction.category && transaction.category.toLowerCase().includes('savings')) {
-            savings += parseFloat(transaction.amount);
+        const txDate = new Date(transaction.date);
+        const month = txDate.getMonth();
+        const year = txDate.getFullYear();
+        // Only count current month for main numbers
+        if (month === currentMonth && year === currentYear) {
+            if (transaction.type === 'income') income += parseFloat(transaction.amount);
+            else if (transaction.type === 'expense') expenses += Math.abs(parseFloat(transaction.amount));
+            if (transaction.category && transaction.category.toLowerCase().includes('savings')) {
+                savings += parseFloat(transaction.amount);
+            }
+        }
+        // Only count previous month for percent change
+        else if (month === prevMonth && year === prevMonthYear) {
+            if (transaction.type === 'income') prevIncome += parseFloat(transaction.amount);
+            else if (transaction.type === 'expense') prevExpenses += Math.abs(parseFloat(transaction.amount));
+            if (transaction.category && transaction.category.toLowerCase().includes('savings')) {
+                prevSavings += parseFloat(transaction.amount);
+            }
         }
     });
     const balance = income - expenses;
+    const prevBalance = prevIncome - prevExpenses;
+
+    // Helper to calculate percent change
+    function percentChange(current, prev) {
+        if (prev === 0) return current === 0 ? 0 : 100;
+        return ((current - prev) / Math.abs(prev)) * 100;
+    }
+
     // Update the summary elements in the Overview tab robustly
     document.querySelectorAll('.stat-card').forEach(card => {
         const title = card.querySelector('h3')?.textContent?.toLowerCase();
         const valueEl = card.querySelector('.stat-value');
-        if (!title || !valueEl) return;
-        if (title.includes('balance')) valueEl.textContent = formatCurrency(balance);
-        else if (title.includes('income')) valueEl.textContent = formatCurrency(income);
-        else if (title.includes('expenses')) valueEl.textContent = formatCurrency(expenses);
-        else if (title.includes('savings')) valueEl.textContent = formatCurrency(savings); // or use a savings formula
+        const changeEl = card.querySelector('.stat-change');
+        if (!title || !valueEl || !changeEl) return;
+        let value = 0, prev = 0, pct = 0;
+        if (title.includes('balance')) {
+            value = balance; prev = prevBalance; pct = percentChange(balance, prev);
+        } else if (title.includes('income')) {
+            value = income; prev = prevIncome; pct = percentChange(income, prev);
+        } else if (title.includes('expenses')) {
+            value = expenses; prev = prevExpenses; pct = percentChange(expenses, prev);
+        } else if (title.includes('savings')) {
+            value = savings; prev = prevSavings; pct = percentChange(savings, prev);
+        }
+        valueEl.textContent = formatCurrency(value);
+        // Format change string and color
+        let sign = pct > 0 ? '+' : pct < 0 ? '-' : '';
+        let absPct = Math.abs(pct).toFixed(1);
+        let colorClass = pct >= 0 ? 'positive' : 'negative';
+        // For expenses, a positive change is bad (red), negative is good (green)
+        if (title.includes('expenses')) colorClass = pct >= 0 ? 'negative' : 'positive';
+        changeEl.className = 'stat-change ' + colorClass;
+        changeEl.textContent = `${sign}${absPct}% from last month`;
     });
-}
-
-// Update spending chart with real data
-function updateSpendingChart(spendingByCategory) {
-    if (!window.spendingChart || !spendingByCategory) return;
-    
-    const labels = Object.keys(spendingByCategory);
-    const data = Object.values(spendingByCategory);
-    
-    window.spendingChart.data.labels = labels;
-    window.spendingChart.data.datasets[0].data = data;
-    window.spendingChart.update();
 }
 
 // Update recent transactions list with real data
@@ -788,45 +866,80 @@ function saveContribution() {
 
 // Initialize insights
 function initializeInsights() {
-    loadInsights();
+    console.log('initializeInsights CALLED'); // Log 2: Inside initializeInsights
+    loadStoredInsights(); // Load stored insights on initial load
     bindInsightEvents();
 }
 
-// Load insights from API
-function loadInsights() {
-    api.getInsights()
-        .then(response => {
-            if (response.status === 'success') {
+// Load stored insights from API
+async function loadStoredInsights() {
+    const insightsContainer = document.querySelector('#insights .insights-container');
+    if (!insightsContainer) {
+        console.error('Insights container not found for loading stored insights.');
+        return;
+    }
+
+    insightsContainer.innerHTML = '<div class="loading-spinner" style="display: flex; justify-content: center; align-items: center; padding: 40px;"><i class="fas fa-spinner fa-spin fa-2x"></i><span style="margin-left: 15px;">Loading insights...</span></div>';
+
+    try {
+        const response = await api.getStoredInsights();
+        if (response.status === 'success') {
+            if (response.data && response.data.length > 0) {
                 populateInsightsContainer(response.data);
+            } else {
+                insightsContainer.innerHTML = '<div class="insights-empty"><div class="empty-icon"><i class="fas fa-lightbulb"></i></div><h3>No insights yet</h3><p>Click \'Refresh Insights\' to generate personalized recommendations.</p></div>';
             }
-        })
-        .catch(error => {
-            console.error('Error loading insights:', error);
-            showNotification('Failed to load insights', 'error');
-        });
+        } else {
+            insightsContainer.innerHTML = '<div class="insights-empty"><p>Could not load stored insights. Try refreshing.</p></div>';
+            showNotification(response.message || 'Failed to load stored insights', 'error');
+        }
+    } catch (error) {
+        console.error('Error loading stored insights:', error);
+        insightsContainer.innerHTML = '<div class="insights-empty"><p>Error loading stored insights. Please try again.</p></div>';
+        showNotification('Failed to load stored insights: ' + error.message, 'error');
+    }
 }
 
 // Refresh insights
 function refreshInsights() {
+    console.log('refreshInsights CALLED'); // Log 7: Inside refreshInsights
     const refreshBtn = document.getElementById('refresh-insights-btn');
-    if (refreshBtn) {
-        refreshBtn.classList.add('loading');
+    const insightsContainer = document.querySelector('#insights .insights-container'); // Target the correct container
+
+    if (!insightsContainer) {
+        console.error('Insights container not found for refresh.');
+        return;
     }
-    
-    api.getInsights()
+
+    if (refreshBtn) {
+        refreshBtn.disabled = true;
+        refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...'; // Add loading state
+    }
+
+    // Clear current insights and show loading placeholder (optional)
+    insightsContainer.innerHTML = '<div class="loading-spinner" style="display: flex; justify-content: center; align-items: center; padding: 40px;"><i class="fas fa-spinner fa-spin fa-2x"></i><span style="margin-left: 15px;">Generating new insights...</span></div>';
+
+    api.generateInsights() // Call the new API function
         .then(response => {
             if (response.status === 'success') {
-                populateInsightsContainer(response.data);
+                console.log('SUCCESS from api.generateInsights. Data:', response.data); // Log 1
+                populateInsightsContainer(response.data); // Populate with new data
                 showNotification('Insights refreshed successfully', 'success');
+            } else {
+                // Handle specific errors if needed, handleResponse in api.js might already do this
+                showNotification(response.message || 'Failed to refresh insights', 'error');
+                insightsContainer.innerHTML = '<div class="insights-empty"><p>Could not load insights.</p></div>'; // Show error state
             }
         })
         .catch(error => {
             console.error('Error refreshing insights:', error);
-            showNotification('Failed to refresh insights', 'error');
+            showNotification('Failed to refresh insights: ' + error.message, 'error');
+            insightsContainer.innerHTML = '<div class="insights-empty"><p>Error loading insights. Please try again.</p></div>'; // Show error state
         })
         .finally(() => {
             if (refreshBtn) {
-                refreshBtn.classList.remove('loading');
+                refreshBtn.disabled = false;
+                refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh Insights'; // Restore button text
             }
         });
 }
@@ -896,10 +1009,10 @@ function getInsightIconType(type) {
 const refreshAnimation = document.createElement('style');
 refreshAnimation.textContent = `
 .rotating {
-    animation: rotate 1s linear;
+    animation: spin 1s linear infinite;
 }
 
-@keyframes rotate {
+@keyframes spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
 }
@@ -921,10 +1034,6 @@ refreshAnimation.textContent = `
     border-radius: 50%;
     border-top-color: white;
     animation: spin 0.6s linear infinite;
-}
-
-@keyframes spin {
-    to { transform: rotate(360deg); }
 }
 `;
 document.head.appendChild(refreshAnimation);
@@ -1177,6 +1286,7 @@ function updateCategoryOptions() {
             { value: 'shopping', text: 'Shopping' },
             { value: 'health', text: 'Health' },
             { value: 'housing', text: 'Housing' },
+            { value: 'savings', text: 'Savings' }, // <-- Added this line
             { value: 'travel', text: 'Travel' },
             { value: 'education', text: 'Education' },
             { value: 'other', text: 'Other' }
@@ -2099,15 +2209,38 @@ async function showGoalHistory(goalId) { // Make it async
 
 // AI Insights functionality
 function bindInsightEvents() {
-    // Refresh insights button
-    const refreshBtn = document.getElementById('refresh-insights-btn');
-    if (refreshBtn) {
-        refreshBtn.addEventListener('click', function() {
-            refreshInsights();
-        });
-    }
+    console.log('bindInsightEvents CALLED'); // Log 3: Inside bindInsightEvents
     
-    // Insight filtering
+    // Get the parent container for the insights tab once
+    const insightsTabContent = document.getElementById('insights');
+    if (!insightsTabContent) {
+        console.error('Insights tab content container NOT FOUND');
+        return; // Exit if the main container isn't there
+    }
+
+    // Event delegation for the Refresh Insights button
+    insightsTabContent.addEventListener('click', function(event) {
+        const refreshBtn = event.target.closest('#refresh-insights-btn');
+        if (refreshBtn) {
+            console.log('Refresh Insights button CLICKED (delegated)'); // Log 5: Click event triggered
+            refreshInsights();
+        }
+
+        // Event delegation for View Details buttons (if needed for dynamic content)
+        const viewDetailsBtn = event.target.closest('.view-details-btn');
+        if (viewDetailsBtn) {
+            const insightCard = viewDetailsBtn.closest('.insight-card');
+            // ... (rest of view details logic remains the same)
+            const insightType = insightCard.getAttribute('data-type'); 
+            const insightTitle = insightCard.querySelector('.insight-header h3').textContent;
+            const insightContent = insightCard.querySelector('.insight-content p').textContent;
+            const insightId = viewDetailsBtn.getAttribute('data-id');
+            showInsightDetails(insightTitle, insightContent, insightType, insightId); 
+        }
+    });
+    console.log('Delegated event listener ADDED to insights tab container'); // Log 6: Delegated listener added
+
+    // Insight filtering (can remain as is, or also be delegated if issues arise)
     const filterButtons = document.querySelectorAll('.insight-filter-btn');
     filterButtons.forEach(button => {
         button.addEventListener('click', function() {
@@ -2119,21 +2252,8 @@ function bindInsightEvents() {
             this.classList.add('active');
         });
     });
-    
-    // View details buttons
-    const detailButtons = document.querySelectorAll('.view-details-btn');
-    detailButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            const insightCard = this.closest('.insight-card');
-            const insightType = insightCard.getAttribute('data-type');
-            const insightTitle = insightCard.querySelector('.insight-header h3').textContent;
-            const insightContent = insightCard.querySelector('.insight-content p').textContent;
-            
-            showInsightDetails(insightTitle, insightContent, insightType);
-        });
-    });
-    
-    // Close detail modal
+
+    // Close detail modal listeners (assuming they are static)
     const closeDetailBtn = document.getElementById('close-detail-modal');
     const closeModalBtn = document.querySelector('#insight-detail-modal .close-modal');
     
@@ -2147,7 +2267,7 @@ function bindInsightEvents() {
 }
 
 // Show insight details
-function showInsightDetails(title, content, type) {
+function showInsightDetails(title, content, type, id) {
     const modal = document.getElementById('insight-detail-modal');
     const modalTitle = document.getElementById('detail-modal-title');
     const modalContent = document.getElementById('detail-modal-content');
@@ -3292,19 +3412,19 @@ function updateGoalSummary(goals) {
 
 // Add placeholder implementation for populateInsightsContainer
 function populateInsightsContainer(insights) {
-    console.log('Populating insights container with:', insights);
+    console.log('populateInsightsContainer CALLED with:', insights); // Log 2
     
-    const insightsContainer = document.querySelector('.insights-container');
+    const insightsContainer = document.querySelector('#insights .insights-container');
     if (!insightsContainer) {
-        console.error('Insights container not found');
+        console.error('Insights container not found in populateInsightsContainer'); // Log 3
         return;
     }
     
-    // Clear the container
-    insightsContainer.innerHTML = '';
-    
-    // Check if we have insights
-    if (!insights || insights.length === 0) {
+    insightsContainer.innerHTML = ''; // Clear existing
+    console.log('Insights container CLEARED'); // Log 4
+
+    if (!insights || !Array.isArray(insights) || insights.length === 0) { // Added Array.isArray check
+        console.warn('No insights to populate or not an array. Insights:', insights); // Log 5
         const emptyState = document.createElement('div');
         emptyState.className = 'insights-empty';
         emptyState.innerHTML = `
@@ -3312,24 +3432,30 @@ function populateInsightsContainer(insights) {
                 <i class="fas fa-lightbulb"></i>
             </div>
             <h3>No insights yet</h3>
-            <p>As you use the app more, we'll provide personalized financial insights here.</p>
+            <p>As you use the app more, or after refreshing, we'll provide personalized financial insights here.</p>
         `;
         insightsContainer.appendChild(emptyState);
         return;
     }
     
     // Add each insight to the container
-    insights.forEach(insight => {
+    insights.forEach((insight, index) => {
+        console.log(`Processing insight #${index}:`, insight);
+        if (!insight || typeof insight.title === 'undefined' || typeof insight.content === 'undefined' || typeof insight.type === 'undefined') {
+            console.error('Malformed insight object at index:', index, insight);
+            return; // Skip this iteration
+        }
+
         const insightCard = document.createElement('div');
-        insightCard.className = 'insight-card';
+        insightCard.className = `insight-card ${insight.type}-insight`;
         insightCard.dataset.type = insight.type;
+        // insightCard.dataset.id = insight.id; // Uncomment if insights have IDs
         
-        const date = new Date(insight.date);
-        const formattedDate = date.toLocaleDateString();
+        // Ensure all formattedDate logic is GONE from here
         
         insightCard.innerHTML = `
             <div class="insight-header">
-                <div class="insight-icon ${insight.type}">
+                <div class="insight-icon ${getInsightIconType(insight.type)}"> 
                     <i class="fas ${getInsightIcon(insight.type)}"></i>
                 </div>
                 <h3>${insight.title}</h3>
@@ -3337,22 +3463,16 @@ function populateInsightsContainer(insights) {
             <div class="insight-content">
                 <p>${insight.content}</p>
                 <div class="insight-actions">
-                    <button class="btn-link view-details-btn" data-id="${insight.id}">View Details</button>
-                    <span class="insight-date">${formattedDate}</span>
+                    <button class="btn-link view-details-btn" data-id="${'temp-' + Math.random().toString(36).substr(2, 9)}">View Details</button> 
+                    
                 </div>
             </div>
         `;
         
         insightsContainer.appendChild(insightCard);
     });
-    
-    // Add event listeners
-    document.querySelectorAll('.view-details-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const id = btn.getAttribute('data-id');
-            showInsightDetails(id);
-        });
-    });
+
+    // Note: Event listeners for view-details-btn are now handled by delegation in bindInsightEvents
 }
 
 // Helper function for goal type icons
@@ -3534,24 +3654,6 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ... existing code ...
-function updateSpendingChartFromTransactions(transactions) {
-    // Only consider expenses
-    const categoryTotals = {};
-    transactions.forEach(tx => {
-        if (tx.type === 'expense') {
-            const cat = tx.category || 'Other';
-            categoryTotals[cat] = (categoryTotals[cat] || 0) + Math.abs(parseFloat(tx.amount));
-        }
-    });
-    const labels = Object.keys(categoryTotals);
-    const data = Object.values(categoryTotals);
-    if (window.spendingChart) {
-        window.spendingChart.data.labels = labels;
-        window.spendingChart.data.datasets[0].data = data;
-        window.spendingChart.update();
-    }
-}
-
 function updateRecentTransactionsFromDashboard(transactions) {
     // Sort by date descending
     const sorted = [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -3592,3 +3694,365 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 }); 
+
+function filterInsights(filter) {
+    console.log('Filtering insights by:', filter);
+    const insightsContainer = document.querySelector('#insights .insights-container');
+    if (!insightsContainer) {
+        console.error('Insights container not found for filtering.');
+        return;
+    }
+
+    const allInsightCards = insightsContainer.querySelectorAll('.insight-card');
+    const noResultsMessage = document.querySelector('#insights .insights-empty .empty-state'); // Target the specific empty state for filtering
+
+    let visibleCount = 0;
+
+    allInsightCards.forEach(card => {
+        const cardType = card.getAttribute('data-type');
+        if (filter === 'all' || cardType === filter) {
+            card.style.display = 'flex'; // Assuming insight cards use flex
+            visibleCount++;
+        } else {
+            card.style.display = 'none';
+        }
+    });
+
+    // Show or hide the "no results" message for filtering
+    if (noResultsMessage) {
+        if (visibleCount === 0 && allInsightCards.length > 0) { // Only show if there were cards to filter but none matched
+            noResultsMessage.parentElement.style.display = 'block'; // Show the parent .insights-empty
+        } else {
+            noResultsMessage.parentElement.style.display = 'none'; // Hide the parent .insights-empty
+        }
+    }
+    
+    // If the main insightsContainer itself becomes completely empty of direct .insight-card children
+    // (e.g. initial load before populateInsightsContainer runs, or if populate clears it and finds nothing),
+    // that's handled by populateInsightsContainer showing its own general empty message.
+    // This filter-specific message only appears if cards *were* populated, but the filter hid them all.
+} 
+
+// Store last loaded insights in memory for reuse
+let lastLoadedInsights = [];
+
+// Patch switchTab to also update goal/budget insights
+const originalSwitchTab = switchTab;
+switchTab = function(tabId) {
+    originalSwitchTab(tabId);
+    if (tabId === 'goals') {
+        renderFilteredInsights('goal', 'goal-insights-container');
+    } else if (tabId === 'budgets') {
+        renderFilteredInsights('budget', 'budget-insights-container');
+    }
+};
+
+// Patch populateInsightsContainer to update lastLoadedInsights
+const originalPopulateInsightsContainer = populateInsightsContainer;
+populateInsightsContainer = function(insights) {
+    lastLoadedInsights = Array.isArray(insights) ? insights : [];
+    originalPopulateInsightsContainer(insights);
+    // Also update goal/budget insights if on those tabs
+    const activeTab = document.querySelector('.tab-content.active');
+    if (activeTab && activeTab.id === 'goals') {
+        renderFilteredInsights('goal', 'goal-insights-container');
+    } else if (activeTab && activeTab.id === 'budgets') {
+        renderFilteredInsights('budget', 'budget-insights-container');
+    }
+};
+
+// Render filtered insights into a given container by type
+function renderFilteredInsights(type, containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.innerHTML = '';
+    const filtered = lastLoadedInsights.filter(insight => insight.type === type);
+    if (filtered.length === 0) {
+        container.innerHTML = `<div class="insights-empty"><div class="empty-icon"><i class="fas fa-lightbulb"></i></div><h3>No ${type} insights yet</h3><p>Click 'Refresh Insights' to generate personalized recommendations.</p></div>`;
+        return;
+    }
+    filtered.forEach(insight => {
+        const card = document.createElement('div');
+        card.className = `insight-card ${insight.type}-insight`;
+        card.dataset.type = insight.type;
+        card.innerHTML = `
+            <div class="insight-header">
+                <div class="insight-icon ${getInsightIconType(insight.type)}">
+                    <i class="fas ${getInsightIcon(insight.type)}"></i>
+                </div>
+                <h3>${insight.title}</h3>
+            </div>
+            <div class="insight-content">
+                <p>${insight.content}</p>
+                <div class="insight-actions">
+                    <button class="btn-link view-details-btn" data-id="${'temp-' + Math.random().toString(36).substr(2, 9)}">View Details</button>
+                </div>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+} 
+
+// Edit transaction by ID
+function editTransaction(id) {
+    // Find the transaction in the current table (or fetch from API if needed)
+    api.getTransactions().then(response => {
+        if (response.status === 'success') {
+            const transaction = response.data.find(tx => String(tx.id) === String(id));
+            if (transaction) {
+                showTransactionModal(transaction);
+            } else {
+                showNotification('Transaction not found', 'error');
+            }
+        } else {
+            showNotification('Failed to fetch transactions', 'error');
+        }
+    }).catch(error => {
+        console.error('Error fetching transactions for edit:', error);
+        showNotification('Error fetching transaction', 'error');
+    });
+}
+
+// ... existing code ...
+function applyTransactionFilters() {
+    // Get filter values
+    const dateFrom = document.getElementById('date-from').value;
+    const dateTo = document.getElementById('date-to').value;
+    const category = document.getElementById('category-filter').value;
+    const type = document.getElementById('type-filter').value;
+
+    api.getTransactions().then(response => {
+        if (response.status === 'success') {
+            let filtered = response.data;
+            // Filter by date range
+            if (dateFrom) {
+                filtered = filtered.filter(tx => new Date(tx.date) >= new Date(dateFrom));
+            }
+            if (dateTo) {
+                filtered = filtered.filter(tx => new Date(tx.date) <= new Date(dateTo));
+            }
+            // Filter by category
+            if (category) {
+                filtered = filtered.filter(tx => tx.category && tx.category.toLowerCase() === category.toLowerCase());
+            }
+            // Filter by type
+            if (type) {
+                filtered = filtered.filter(tx => tx.type === type);
+            }
+            populateTransactionsTable(filtered);
+            updateTransactionSummary(filtered);
+        } else {
+            showNotification('Failed to load transactions for filtering', 'error');
+        }
+    }).catch(error => {
+        console.error('Error filtering transactions:', error);
+        showNotification('Error filtering transactions', 'error');
+    });
+}
+
+let spendingChartPeriod = 'month'; // Default period
+
+// --- Transactions Page Period & Filter Logic ---
+function setDefaultTransactionDateRange() {
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    document.getElementById('date-from').value = firstDay.toISOString().slice(0, 10);
+    document.getElementById('date-to').value = lastDay.toISOString().slice(0, 10);
+}
+
+function getActiveTransactionRangeText() {
+    const from = document.getElementById('date-from').value;
+    const to = document.getElementById('date-to').value;
+    if (!from && !to) return 'Showing: All Transactions';
+    const fromDate = from ? new Date(from) : null;
+    const toDate = to ? new Date(to) : null;
+    const opts = { year: 'numeric', month: 'short', day: 'numeric' };
+    if (fromDate && toDate) {
+        return `Showing: ${fromDate.toLocaleDateString(undefined, opts)} – ${toDate.toLocaleDateString(undefined, opts)}`;
+    } else if (fromDate) {
+        return `Showing: From ${fromDate.toLocaleDateString(undefined, opts)}`;
+    } else if (toDate) {
+        return `Showing: Up to ${toDate.toLocaleDateString(undefined, opts)}`;
+    }
+    return 'Showing: All Transactions';
+}
+
+function highlightActiveFilters() {
+    const filtersSection = document.querySelector('.transactions-filters');
+    const from = document.getElementById('date-from').value;
+    const to = document.getElementById('date-to').value;
+    const category = document.getElementById('category-filter').value;
+    const type = document.getElementById('type-filter').value;
+    if (from || to || category || type) {
+        filtersSection.classList.add('filters-active');
+    } else {
+        filtersSection.classList.remove('filters-active');
+    }
+}
+
+function bindTransactionPeriodButtons() {
+    const periodBtns = document.querySelectorAll('.period-btn');
+    periodBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            periodBtns.forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            const now = new Date();
+            let from, to;
+            if (this.dataset.period === 'week') {
+                const dayOfWeek = now.getDay();
+                const start = new Date(now);
+                start.setDate(now.getDate() - dayOfWeek);
+                from = start.toISOString().slice(0, 10);
+                to = now.toISOString().slice(0, 10);
+            } else if (this.dataset.period === 'month') {
+                const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+                const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                from = firstDay.toISOString().slice(0, 10);
+                to = lastDay.toISOString().slice(0, 10);
+            } else if (this.dataset.period === 'year') {
+                const firstDay = new Date(now.getFullYear(), 0, 1);
+                const lastDay = new Date(now.getFullYear(), 11, 31);
+                from = firstDay.toISOString().slice(0, 10);
+                to = lastDay.toISOString().slice(0, 10);
+            } else {
+                from = '';
+                to = '';
+            }
+            document.getElementById('date-from').value = from;
+            document.getElementById('date-to').value = to;
+            applyTransactionFilters();
+        });
+    });
+}
+
+function bindClearFiltersButton() {
+    const clearBtn = document.getElementById('clear-filters');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', function() {
+            document.getElementById('date-from').value = '';
+            document.getElementById('date-to').value = '';
+            document.getElementById('category-filter').value = '';
+            document.getElementById('type-filter').value = '';
+            document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector('.period-btn[data-period="all"]').classList.add('active');
+            applyTransactionFilters();
+        });
+    }
+}
+
+// Patch applyTransactionFilters to update range text and highlight
+const originalApplyTransactionFilters = applyTransactionFilters;
+applyTransactionFilters = function() {
+    originalApplyTransactionFilters();
+    // Update active range text
+    const rangeText = getActiveTransactionRangeText();
+    const rangeEl = document.getElementById('transactions-active-range');
+    if (rangeEl) rangeEl.textContent = rangeText;
+    // Highlight active filters
+    highlightActiveFilters();
+};
+
+// On DOMContentLoaded, set up default and bind events
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupTransactionsFiltersUI);
+} else {
+    setupTransactionsFiltersUI();
+}
+function setupTransactionsFiltersUI() {
+    if (document.getElementById('transactions')) {
+        setDefaultTransactionDateRange();
+        bindTransactionPeriodButtons();
+        bindClearFiltersButton();
+        applyTransactionFilters(); // Auto-apply on load
+    }
+    // Add event listener for type filter change
+    const typeFilterElement = document.getElementById('type-filter');
+    if (typeFilterElement) {
+        typeFilterElement.addEventListener('change', updateFilterCategoryOptions);
+        // Also call it once on load to populate categories based on default type
+        updateFilterCategoryOptions(); 
+    }
+}
+
+// Update category options for the transaction filter based on transaction type
+function updateFilterCategoryOptions() {
+    const typeFilterSelect = document.getElementById('type-filter');
+    const categoryFilterSelect = document.getElementById('category-filter');
+
+    if (!typeFilterSelect || !categoryFilterSelect) return;
+
+    const selectedType = typeFilterSelect.value;
+    const currentCategoryValue = categoryFilterSelect.value; // Preserve selection if possible
+
+    // Clear current options
+    categoryFilterSelect.innerHTML = '';
+
+    // Add 'All Categories' option first
+    const allCategoriesOption = document.createElement('option');
+    allCategoriesOption.value = '';
+    allCategoriesOption.textContent = 'All Categories';
+    categoryFilterSelect.appendChild(allCategoriesOption);
+
+    let categoriesToShow = [];
+
+    if (selectedType === 'income') {
+        categoriesToShow = [
+            { value: 'income', text: 'Income' },
+            { value: 'salary', text: 'Salary' },
+            { value: 'investment', text: 'Investment' },
+            { value: 'other', text: 'Other (Income)' }
+        ];
+    } else if (selectedType === 'expense') {
+        categoriesToShow = [
+            { value: 'groceries', text: 'Groceries' },
+            { value: 'dining', text: 'Dining Out' },
+            { value: 'transportation', text: 'Transportation' },
+            { value: 'entertainment', text: 'Entertainment' },
+            { value: 'utilities', text: 'Utilities' },
+            { value: 'shopping', text: 'Shopping' },
+            { value: 'health', text: 'Health' },
+            { value: 'housing', text: 'Housing' },
+            { value: 'savings', text: 'Savings' },
+            { value: 'travel', text: 'Travel' },
+            { value: 'education', text: 'Education' },
+            { value: 'other', text: 'Other (Expense)' }
+        ];
+    } else { // 'All Types' or empty
+        // Show all possible categories (could be a combined list or default to all expense + all income)
+        categoriesToShow = [
+            // Income first
+            { value: 'income', text: 'Income' },
+            { value: 'salary', text: 'Salary' },
+            { value: 'investment', text: 'Investment' },
+             // Expenses next
+            { value: 'groceries', text: 'Groceries' },
+            { value: 'dining', text: 'Dining Out' },
+            { value: 'transportation', text: 'Transportation' },
+            { value: 'entertainment', text: 'Entertainment' },
+            { value: 'utilities', text: 'Utilities' },
+            { value: 'shopping', text: 'Shopping' },
+            { value: 'health', text: 'Health' },
+            { value: 'housing', text: 'Housing' },
+            { value: 'savings', text: 'Savings' },
+            { value: 'travel', text: 'Travel' },
+            { value: 'education', text: 'Education' },
+            // General 'Other'
+            { value: 'other', text: 'Other' }
+        ];
+    }
+
+    categoriesToShow.forEach(category => {
+        const option = document.createElement('option');
+        option.value = category.value;
+        option.textContent = category.text;
+        categoryFilterSelect.appendChild(option);
+    });
+    
+    // Try to reselect previous value if it still exists
+    if (Array.from(categoryFilterSelect.options).some(opt => opt.value === currentCategoryValue)) {
+        categoryFilterSelect.value = currentCategoryValue;
+    } else {
+        categoryFilterSelect.value = ''; // Default to 'All Categories'
+    }
+}

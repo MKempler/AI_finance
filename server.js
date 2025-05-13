@@ -10,7 +10,7 @@ const transactionRoutes = require('./routes/transactions');
 const budgetRoutes = require('./routes/budgets');
 const goalRoutes = require('./routes/goals');
 const dashboardRoutes = require('./server/routes/dashboard');
-const aiRoutes = require('./server/routes/ai');
+const aiRoutes = require('./routes/ai');
 const syncRoutes = require('./server/routes/sync');
 const authMiddleware = require('./middleware/auth');
 
@@ -57,7 +57,7 @@ app.use('/api/transactions', authMiddleware, transactionRoutes);
 app.use('/api/budgets', authMiddleware, budgetRoutes);
 app.use('/api/goals', authMiddleware, goalRoutes);
 app.use('/api/dashboard', authMiddleware, dashboardRoutes);
-app.use('/api/ai', authMiddleware, aiRoutes);
+app.use('/api/ai', aiRoutes);
 app.use('/api/sync', authMiddleware, syncRoutes);
 
 // Auth pages routes (no auth required)
