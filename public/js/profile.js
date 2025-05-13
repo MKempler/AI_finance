@@ -1,6 +1,6 @@
 /**
  * Profile Page Functionality
- * Handles user profile data and interactions
+ * Handles user profile data and interactions with the API
  */
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -10,42 +10,68 @@ document.addEventListener('DOMContentLoaded', function() {
     const profileFullName = document.getElementById('profile-full-name');
     const profileEmail = document.getElementById('profile-email');
     const profileForm = document.getElementById('profile-form');
-    const logoutBtn = document.getElementById('logout-btn');
-    const cancelButtons = document.querySelectorAll('.btn-cancel');
-    const avatarUpload = document.querySelector('.avatar-upload');
-    const toggleSwitches = document.querySelectorAll('.toggle-switch input');
-    const connectButton = document.querySelector('.connected-accounts button[style="color: var(--primary-color);"]');
-    const disconnectButtons = document.querySelectorAll('.btn-disconnect');
-    const editProfileBtn = document.querySelector('.btn-edit-profile');
+    const passwordForm = document.getElementById('password-form');
+    const profileCancelBtn = document.getElementById('profile-cancel');
+    const passwordCancelBtn = document.getElementById('password-cancel');
+    const notification = document.getElementById('notification');
+    
+    // Store original user data from server
+    let originalUserData = null;
     
     // Initialize profile data
-    initializeProfile();
+    loadUserProfile();
     
     // Set up event listeners
     setupEventListeners();
     
     /**
-     * Initialize profile with user data
+     * Load user profile data from API
      */
-    function initializeProfile() {
-        const user = getUser();
-        
+    async function loadUserProfile() {
+        try {
+            showNotification('Loading profile...', 'info');
+            
+            const response = await api.getUserProfile();
+            
+            if (response.user) {
+                // Store the original user data
+                originalUserData = response.user;
+                
+                updateProfileDisplay(response.user);
+                populateProfileForm(response.user);
+                hideNotification();
+            } else {
+                showNotification('Failed to load profile data', 'error');
+            }
+        } catch (error) {
+            console.error('Error loading profile:', error);
+            showNotification('Error loading profile. Please try again.', 'error');
+        }
+    }
+    
+    /**
+     * Update profile display with user data
+     */
+    function updateProfileDisplay(user) {
         // Update elements with user data
-        if (profileName) profileName.textContent = user.firstName;
-        if (profileFullName) profileFullName.textContent = `${user.firstName} ${user.lastName}`;
-        if (profileEmail) profileEmail.textContent = user.email;
+        if (profileName) profileName.textContent = user.name?.split(' ')[0] || 'User';
+        if (profileFullName) profileFullName.textContent = user.name || 'User';
+        if (profileEmail) profileEmail.textContent = user.email || '';
         
         // Update avatar with user initial
+        const initial = user.name ? user.name.charAt(0).toUpperCase() : 'U';
         avatarElements.forEach(el => {
-            if (el) el.textContent = user.firstName.charAt(0).toUpperCase();
+            if (el) el.textContent = initial;
         });
+    }
         
-        // Set form field values
+    /**
+     * Populate profile form with user data
+     */
+    function populateProfileForm(user) {
         if (profileForm) {
-            document.getElementById('firstName').value = user.firstName;
-            document.getElementById('lastName').value = user.lastName;
-            document.getElementById('email').value = user.email;
-            document.getElementById('phone').value = user.phone || '';
+            document.getElementById('name').value = user.name || '';
+            document.getElementById('email').value = user.email || '';
         }
     }
     
@@ -58,181 +84,193 @@ document.addEventListener('DOMContentLoaded', function() {
             profileForm.addEventListener('submit', handleProfileFormSubmit);
         }
         
-        // Logout button
-        if (logoutBtn) {
-            logoutBtn.addEventListener('click', handleLogout);
-        }
-        
-        // Edit profile button
-        if (editProfileBtn) {
-            editProfileBtn.addEventListener('click', function() {
-                // Scroll to the profile form
-                const profileSection = document.querySelector('.profile-section');
-                if (profileSection) {
-                    profileSection.scrollIntoView({ behavior: 'smooth' });
-                }
-                
-                // Focus on first name field
-                const firstNameInput = document.getElementById('firstName');
-                if (firstNameInput) {
-                    setTimeout(() => firstNameInput.focus(), 500);
-                }
-            });
+        // Password form submission
+        if (passwordForm) {
+            passwordForm.addEventListener('submit', handlePasswordFormSubmit);
         }
         
         // Cancel buttons
-        cancelButtons.forEach(button => {
-            button.addEventListener('click', handleCancel);
-        });
-        
-        // Avatar upload
-        if (avatarUpload) {
-            avatarUpload.addEventListener('click', function() {
-                alert('Profile picture upload feature will be available soon!');
-            });
+        if (profileCancelBtn) {
+            profileCancelBtn.addEventListener('click', () => loadUserProfile());
         }
         
-        // Toggle switches
-        toggleSwitches.forEach(toggle => {
-            toggle.addEventListener('change', handleToggleChange);
-        });
-        
-        // Connect account button
-        if (connectButton) {
-            connectButton.addEventListener('click', function() {
-                alert('Account connection feature will be available soon!');
-            });
+        if (passwordCancelBtn) {
+            passwordCancelBtn.addEventListener('click', clearPasswordForm);
         }
-        
-        // Disconnect account buttons
-        disconnectButtons.forEach(button => {
-            button.addEventListener('click', handleDisconnectAccount);
-        });
-    }
-    
-    /**
-     * Get user data from local storage
-     * @returns {Object} User data
-     */
-    function getUser() {
-        const userString = localStorage.getItem('user');
-        if (userString) {
-            try {
-                return JSON.parse(userString);
-            } catch (e) {
-                console.error('Error parsing user data:', e);
-            }
-        }
-        
-        // Default user data if none is found
-        return {
-            firstName: 'Testing',
-            lastName: 'User',
-            email: 'testing@example.com',
-            phone: '+1 (555) 123-4567',
-            initial: 'T'
-        };
     }
     
     /**
      * Handle profile form submission
      * @param {Event} e - Submit event
      */
-    function handleProfileFormSubmit(e) {
+    async function handleProfileFormSubmit(e) {
         e.preventDefault();
         
         // Get form data
-        const firstName = document.getElementById('firstName').value;
-        const lastName = document.getElementById('lastName').value;
-        const email = document.getElementById('email').value;
-        const phone = document.getElementById('phone').value;
+        const name = document.getElementById('name').value.trim();
+        const email = document.getElementById('email').value.trim();
         
         // Validate form data
-        if (!firstName.trim() || !lastName.trim() || !email.trim()) {
-            alert('Please fill in all required fields.');
+        if (!name || !email) {
+            showNotification('Please fill in all required fields', 'error');
             return;
         }
         
         // Email validation
         if (!validateEmail(email)) {
-            alert('Please enter a valid email address.');
+            showNotification('Please enter a valid email address', 'error');
             return;
         }
         
-        // Get current user data
-        const user = getUser();
+        // Only include fields that have changed
+        const userData = {};
         
-        // Update user object
-        user.firstName = firstName;
-        user.lastName = lastName;
-        user.email = email;
-        user.phone = phone;
+        if (name !== originalUserData.name) {
+            userData.name = name;
+        }
         
-        // Save to local storage
-        localStorage.setItem('user', JSON.stringify(user));
+        if (email !== originalUserData.email) {
+            userData.email = email;
+        }
         
-        // Update displayed information
-        if (profileName) profileName.textContent = firstName;
-        if (profileFullName) profileFullName.textContent = `${firstName} ${lastName}`;
-        if (profileEmail) profileEmail.textContent = email;
+        // Don't make API call if nothing changed
+        if (Object.keys(userData).length === 0) {
+            showNotification('No changes detected', 'info');
+            return;
+        }
         
-        // Update avatar with new initial
-        avatarElements.forEach(el => {
-            if (el) el.textContent = firstName.charAt(0).toUpperCase();
-        });
-        
-        // Show confirmation message
-        alert('Profile updated successfully!');
-    }
-    
-    /**
-     * Handle logout button click
-     */
-    function handleLogout() {
-        // Confirm logout
-        if (confirm('Are you sure you want to log out?')) {
-            // In a real app, we would clear the session and token
-            // For this prototype, we'll just redirect to login
-            window.location.href = 'login.html';
+        try {
+            showNotification('Updating profile...', 'info');
+            
+            const response = await api.updateUserProfile(userData);
+            
+            if (response.status === 'success' && response.data) {
+                // Update original data with new values
+                originalUserData = response.data;
+                
+                updateProfileDisplay(response.data);
+                showNotification('Profile updated successfully', 'success');
+            } else {
+                showNotification(response.message || 'Failed to update profile', 'error');
+            }
+        } catch (error) {
+            console.error('Error updating profile:', error);
+            showNotification('Error updating profile. Please try again.', 'error');
         }
     }
     
     /**
-     * Handle cancel button click
+     * Handle password form submission
+     * @param {Event} e - Submit event
      */
-    function handleCancel() {
-        // Reset form fields to original values
-        if (this.closest('form') === profileForm) {
-            const user = getUser();
-            document.getElementById('firstName').value = user.firstName;
-            document.getElementById('lastName').value = user.lastName;
-            document.getElementById('email').value = user.email;
-            document.getElementById('phone').value = user.phone || '';
-        } else {
-            // For password form, just clear the fields
-            const passwordFields = this.closest('.profile-section').querySelectorAll('input[type="password"]');
-            passwordFields.forEach(field => field.value = '');
+    async function handlePasswordFormSubmit(e) {
+        e.preventDefault();
+        
+        // Get form data
+        const currentPassword = document.getElementById('currentPassword').value;
+        const newPassword = document.getElementById('newPassword').value;
+        const confirmPassword = document.getElementById('confirmPassword').value;
+        
+        // Validate form data
+        if (!currentPassword || !newPassword || !confirmPassword) {
+            showNotification('Please fill in all password fields', 'error');
+            return;
+        }
+        
+        if (newPassword !== confirmPassword) {
+            showNotification('New passwords do not match', 'error');
+            return;
+        }
+        
+        // Password strength validation
+        if (newPassword.length < 6) {
+            showNotification('Password must be at least 6 characters long', 'error');
+            return;
+        }
+        
+        // Prepare data for API
+        const passwordData = {
+            currentPassword: currentPassword,
+            newPassword: newPassword
+        };
+        
+        try {
+            showNotification('Updating password...', 'info');
+            
+            const response = await api.updatePassword(passwordData);
+            
+            if (response.status === 'success') {
+                clearPasswordForm();
+                showNotification('Password updated successfully', 'success');
+            } else {
+                showNotification(response.message || 'Failed to update password', 'error');
+            }
+        } catch (error) {
+            console.error('Error updating password:', error);
+            showNotification('Error updating password. Please try again.', 'error');
         }
     }
     
     /**
-     * Handle toggle switch change
+     * Clear password form
      */
-    function handleToggleChange() {
-        const label = this.closest('.security-option').querySelector('.option-label').textContent;
-        alert(`${label} has been ${this.checked ? 'enabled' : 'disabled'}.`);
-        
-        // In a real app, we would save this setting to the user's profile
+    function clearPasswordForm() {
+        if (passwordForm) {
+            document.getElementById('currentPassword').value = '';
+            document.getElementById('newPassword').value = '';
+            document.getElementById('confirmPassword').value = '';
+        }
     }
     
     /**
-     * Handle disconnect account button click
+     * Show notification to user
+     * @param {string} message - Message to display
+     * @param {string} type - Type of notification (success, error, info)
      */
-    function handleDisconnectAccount() {
-        const accountName = this.closest('.account-item').querySelector('h4').textContent;
-        if (confirm(`Are you sure you want to disconnect ${accountName}?`)) {
-            alert(`${accountName} has been disconnected.`);
-            this.closest('.account-item').remove();
+    function showNotification(message, type) {
+        if (!notification) return;
+        
+        // Clear previous content
+        notification.innerHTML = '';
+        
+        // Add appropriate icon
+        const icon = document.createElement('i');
+        switch (type) {
+            case 'success':
+                icon.className = 'fas fa-check-circle';
+                break;
+            case 'error':
+                icon.className = 'fas fa-exclamation-circle';
+                break;
+            case 'info':
+                icon.className = 'fas fa-info-circle';
+                break;
+            default:
+                icon.className = 'fas fa-info-circle';
+        }
+        
+        notification.appendChild(icon);
+        
+        // Add message
+        const messageSpan = document.createElement('span');
+        messageSpan.textContent = message;
+        notification.appendChild(messageSpan);
+        
+        // Set the notification type class
+        notification.className = `notification ${type}`;
+        
+        // Auto-hide success messages after delay
+        if (type === 'success') {
+            setTimeout(hideNotification, 3000);
+        }
+    }
+    
+    /**
+     * Hide notification
+     */
+    function hideNotification() {
+        if (notification) {
+            notification.classList.add('hidden');
         }
     }
     

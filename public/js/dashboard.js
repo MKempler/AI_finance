@@ -14,6 +14,19 @@ document.addEventListener('DOMContentLoaded', function() {
     // Comment out this line since the function doesn't exist yet
     // initializeSettings();
     setupCSVImportModal();
+    loadDashboardData(); // <-- Ensure dashboard stats are loaded on page load
+    // Hash-based tab navigation
+    function showTabFromHash() {
+        const hash = window.location.hash.replace('#', '');
+        const validTabs = ['overview', 'transactions', 'budgets', 'goals', 'insights', 'settings'];
+        if (validTabs.includes(hash)) {
+            switchTab(hash);
+        } else {
+            switchTab('overview');
+        }
+    }
+    window.addEventListener('hashchange', showTabFromHash);
+    showTabFromHash();
 });
 
 // Initialize user data if it doesn't exist
@@ -128,6 +141,8 @@ function switchTab(tabId) {
             link.classList.remove('active');
         }
     });
+    // Update the URL hash
+    window.location.hash = '#' + tabId;
 }
 
 // Initialize charts
@@ -275,15 +290,12 @@ function populateUserGreeting() {
 
 // Load dashboard data from API
 function loadDashboardData() {
-    api.getDashboardOverview()
+    api.getTransactions()
         .then(response => {
             if (response.status === 'success') {
-                const data = response.data;
-                updateDashboardStats(data.summary);
-                updateSpendingChart(data.spendingByCategory);
-                updateRecentTransactions(data.recentTransactions);
-                updateBudgetProgress(data.activeBudgets);
-                updateAIInsights(data.insights);
+                updateDashboardStatsFromTransactions(response.data);
+                updateSpendingChartFromTransactions(response.data);
+                updateRecentTransactionsFromDashboard(response.data);
             }
         })
         .catch(error => {
@@ -293,27 +305,31 @@ function loadDashboardData() {
 }
 
 // Update dashboard statistics
-function updateDashboardStats(summary) {
-    const balanceElement = document.querySelector('.stat-value:nth-of-type(1)');
-    const incomeElement = document.querySelector('.stat-value:nth-of-type(2)');
-    const expensesElement = document.querySelector('.stat-value:nth-of-type(3)');
-    const savingsElement = document.querySelector('.stat-value:nth-of-type(4)');
-
-    if (balanceElement && summary.totalBalance) {
-        balanceElement.textContent = formatCurrency(summary.totalBalance);
-    }
-
-    if (incomeElement && summary.monthlyIncome) {
-        incomeElement.textContent = formatCurrency(summary.monthlyIncome);
-    }
-
-    if (expensesElement && summary.monthlyExpenses) {
-        expensesElement.textContent = formatCurrency(summary.monthlyExpenses);
-    }
-
-    if (savingsElement && summary.savingsRate) {
-        savingsElement.textContent = `${summary.savingsRate.toFixed(1)}%`;
-    }
+function updateDashboardStatsFromTransactions(transactions) {
+    // Calculate totals
+    let income = 0;
+    let expenses = 0;
+    let savings = 0;
+    transactions.forEach(transaction => {
+        if (transaction.type === 'income') {
+            income += parseFloat(transaction.amount);
+        } else if (transaction.type === 'expense') {
+            expenses += Math.abs(parseFloat(transaction.amount));
+        } else if (transaction.category && transaction.category.toLowerCase().includes('savings')) {
+            savings += parseFloat(transaction.amount);
+        }
+    });
+    const balance = income - expenses;
+    // Update the summary elements in the Overview tab robustly
+    document.querySelectorAll('.stat-card').forEach(card => {
+        const title = card.querySelector('h3')?.textContent?.toLowerCase();
+        const valueEl = card.querySelector('.stat-value');
+        if (!title || !valueEl) return;
+        if (title.includes('balance')) valueEl.textContent = formatCurrency(balance);
+        else if (title.includes('income')) valueEl.textContent = formatCurrency(income);
+        else if (title.includes('expenses')) valueEl.textContent = formatCurrency(expenses);
+        else if (title.includes('savings')) valueEl.textContent = formatCurrency(savings); // or use a savings formula
+    });
 }
 
 // Update spending chart with real data
@@ -462,15 +478,18 @@ function saveTransaction() {
     const transactionId = form.getAttribute('data-id');
     const isEdit = !!transactionId;
     
+    // Use correct field IDs for all fields
     const transaction = {
-        amount: parseFloat(form.amount.value),
-        description: form.description.value,
-        category: form.category.value,
-        date: form.date.value
+        amount: parseFloat(document.getElementById('transaction-amount').value),
+        description: document.getElementById('transaction-description').value,
+        category: document.getElementById('transaction-category').value,
+        date: document.getElementById('transaction-date').value,
+        type: document.getElementById('transaction-type').value,
+        memo: document.getElementById('transaction-memo').value || null
     };
     
     // Validate form
-    if (!transaction.amount || !transaction.description || !transaction.category || !transaction.date) {
+    if (!transaction.amount || !transaction.description || !transaction.category || !transaction.date || !transaction.type) {
         showNotification('Please fill in all required fields', 'error');
         return;
     }
@@ -545,22 +564,36 @@ function saveBudget() {
     
     const budgetId = form.getAttribute('data-id');
     const isEdit = !!budgetId;
+
+    const categorySelect = document.getElementById('budget-category-select');
+    let categoryValue = categorySelect.value;
+    if (categoryValue === '__custom__') {
+        categoryValue = document.getElementById('budget-custom-category').value.trim();
+        if (!categoryValue) {
+            showNotification('Please enter a custom category name.', 'error');
+            return;
+        }
+    }
     
     const budget = {
-        category: form.category.value,
-        amount: parseFloat(form.amount.value),
-        period: form.period.value,
-        startDate: form.startDate.value,
-        endDate: form.endDate.value || null
+        category: categoryValue,
+        amount: parseFloat(document.getElementById('budget-amount').value),
+        period: document.getElementById('budget-period').value,
+        start_date: document.getElementById('budget-start-date').value,
+        notes: document.getElementById('budget-notes').value || null
     };
     
-    // Validate form
-    if (!budget.category || !budget.amount || !budget.period || !budget.startDate) {
-        showNotification('Please fill in all required fields', 'error');
+    // Validate form (amount, period, start_date are already handled)
+    if (!budget.category) { // Category is now the main validation here
+        showNotification('Please select or enter a category.', 'error');
+        return;
+    }
+    if (!budget.amount || !budget.period || !budget.start_date) {
+        showNotification('Please fill in amount, period, and start date.', 'error');
         return;
     }
     
-    // Save budget
+    // Save budget via API
     const savePromise = isEdit
         ? api.updateBudget(budgetId, budget)
         : api.createBudget(budget);
@@ -580,6 +613,54 @@ function saveBudget() {
             console.error('Error saving budget:', error);
             showNotification('Failed to save budget', 'error');
         });
+}
+
+// Delete budget
+function deleteBudget(id) {
+    if (!confirm('Are you sure you want to delete this budget?')) {
+        return;
+    }
+    
+    api.deleteBudget(id)
+        .then(response => {
+            if (response.status === 'success') {
+                showNotification('Budget deleted successfully', 'success');
+                loadBudgets(); // Refresh budgets
+            }
+        })
+        .catch(error => {
+            console.error('Error deleting budget:', error);
+            showNotification('Failed to delete budget', 'error');
+        });
+}
+
+// Edit Budget - fetch data first (simplified)
+async function editBudget(budgetId) {
+    console.log('Editing budget:', budgetId);
+    try {
+        // In a more robust app, you might fetch just this one budget
+        // For simplicity here, we find it in the locally stored list (if available)
+        // Or ideally, fetch the specific budget data from the API
+        // Let's assume we refetch all for now to get the data
+        const response = await api.getBudgets(); 
+        if (response.status === 'success') {
+            const budgetData = response.data.find(b => b.id == budgetId);
+            if (budgetData) {
+                 // Format date correctly for the input field if needed
+                 if (budgetData.start_date) {
+                     budgetData.start_date = moment(budgetData.start_date).format('YYYY-MM-DD');
+                 }
+                 showBudgetModal(budgetData); // Show modal with real data
+            } else {
+                 showNotification('Budget not found.', 'error');
+            }
+        } else {
+            showNotification('Could not load budget data for editing.', 'error');
+        }
+    } catch (error) {
+        console.error('Error fetching budget for edit:', error);
+        showNotification('Error fetching budget data.', 'error');
+    }
 }
 
 // Initialize goals
@@ -607,46 +688,58 @@ function loadGoals() {
 // Save goal
 function saveGoal() {
     const form = document.getElementById('goal-form');
-    if (!form) return;
     
-    const goalId = form.getAttribute('data-id');
-    const isEdit = !!goalId;
+    if (form.checkValidity()) {
+        const goalId = document.getElementById('goal-id').value;
+        const title = document.getElementById('goal-title').value;
+        const category = document.getElementById('goal-category').value;
+        const targetAmount = document.getElementById('goal-target-amount').value;
+        const currentAmount = document.getElementById('goal-current-amount').value || '0';
+        const targetDate = document.getElementById('goal-target-date').value;
+        const description = document.getElementById('goal-description').value;
     
-    const goal = {
-        name: form.name.value,
-        targetAmount: parseFloat(form.targetAmount.value),
-        currentAmount: parseFloat(form.currentAmount.value || 0),
-        deadline: form.deadline.value,
-        type: form.type.value,
-        description: form.description.value || ''
-    };
-    
-    // Validate form
-    if (!goal.name || !goal.targetAmount || !goal.deadline || !goal.type) {
-        showNotification('Please fill in all required fields', 'error');
-        return;
-    }
+        // Format the goal data for the API with snake_case property names to match server validation
+        const goalData = {
+            name: title,
+            type: category,
+            target_amount: parseFloat(targetAmount),
+            current_amount: parseFloat(currentAmount),
+            deadline: targetDate,
+            description: description
+        };
+        
+        console.log('Saving goal with data:', goalData);
+        console.log('Auth token exists:', !!localStorage.getItem('token'));
+        
+        const isEdit = !!goalId;
     
     // Save goal
     const savePromise = isEdit
-        ? api.updateGoal(goalId, goal)
-        : api.createGoal(goal);
+            ? api.updateGoal(goalId, goalData)
+            : api.createGoal(goalData);
     
     savePromise
         .then(response => {
+                console.log('Goal save response:', response);
             if (response.status === 'success') {
                 closeGoalModal();
                 showNotification(
                     isEdit ? 'Goal updated successfully' : 'Goal added successfully',
                     'success'
                 );
-                loadGoals(); // Refresh goals
+                    loadGoals(); // Refresh goals list
+                } else {
+                    showNotification('Failed to save goal: ' + (response.message || 'Unknown error'), 'error');
             }
         })
         .catch(error => {
             console.error('Error saving goal:', error);
-            showNotification('Failed to save goal', 'error');
+                showNotification('Failed to save goal: ' + error.message, 'error');
         });
+    } else {
+        // Trigger form validation
+        form.reportValidity();
+    }
 }
 
 // Save goal contribution
@@ -1279,6 +1372,41 @@ function bindBudgetEvents() {
             editBudget(budgetId);
         });
     });
+
+    // Add event listeners for dynamically created edit/delete buttons
+    document.querySelector('.budget-categories-list').addEventListener('click', (event) => {
+        const editButton = event.target.closest('.edit-budget');
+        const deleteButton = event.target.closest('.delete-budget'); // Add delete button class
+
+        if (editButton) {
+            const budgetId = editButton.getAttribute('data-id');
+            editBudget(budgetId);
+        }
+        
+        if (deleteButton) {
+            const budgetId = deleteButton.getAttribute('data-id');
+            deleteBudget(budgetId);
+        }
+    });
+}
+
+// Placeholder: Implement budget period change logic
+function changeBudgetPeriod(direction) {
+    console.warn('changeBudgetPeriod not fully implemented. Direction:', direction);
+    // TODO: Update the displayed period text (e.g., "August 2025")
+    // TODO: Potentially call loadBudgets() if backend supports filtering by period
+}
+
+// Placeholder: Implement budget filtering logic
+function filterBudgetCategories(view) {
+    console.warn('filterBudgetCategories not fully implemented. View:', view);
+    const budgetItems = document.querySelectorAll('.budget-category-item');
+    budgetItems.forEach(item => {
+        item.style.display = 'flex'; // Show all for now
+        // TODO: Implement filtering logic based on 'spent' vs 'amount'
+        // if (view === 'over') { ... }
+        // if (view === 'under') { ... }
+    });
 }
 
 // Create budget modal HTML
@@ -1297,8 +1425,8 @@ function createBudgetModal() {
                 <form id="budget-form">
                     <input type="hidden" id="budget-id">
                     <div class="form-group">
-                        <label for="budget-category">Category</label>
-                        <select id="budget-category" required>
+                        <label for="budget-category-select">Category</label>
+                        <select id="budget-category-select" required>
                             <option value="">Select Category</option>
                             <option value="housing">Housing</option>
                             <option value="groceries">Groceries</option>
@@ -1311,7 +1439,12 @@ function createBudgetModal() {
                             <option value="savings">Savings</option>
                             <option value="debt">Debt Payments</option>
                             <option value="other">Other</option>
+                            <option value="__custom__">Create New Category...</option> 
                         </select>
+                    </div>
+                    <div class="form-group" id="custom-category-group" style="display: none;">
+                        <label for="budget-custom-category">Custom Category Name</label>
+                        <input type="text" id="budget-custom-category" placeholder="Enter custom category">
                     </div>
                     <div class="form-group">
                         <label for="budget-amount">Monthly Budget Amount</label>
@@ -1342,6 +1475,18 @@ function createBudgetModal() {
         </div>
     `;
     
+    // Add event listener to toggle custom category input
+    const categorySelect = modal.querySelector('#budget-category-select');
+    const customCategoryGroup = modal.querySelector('#custom-category-group');
+    categorySelect.addEventListener('change', function() {
+        if (this.value === '__custom__') {
+            customCategoryGroup.style.display = 'block';
+            modal.querySelector('#budget-custom-category').focus();
+        } else {
+            customCategoryGroup.style.display = 'none';
+        }
+    });
+    
     return modal;
 }
 
@@ -1369,23 +1514,46 @@ function showBudgetModal(budgetData = null) {
     }
     
     // Update modal content if editing
+    if (modal) { // If modal exists when showing
+        const categorySelect = modal.querySelector('#budget-category-select');
+        const customCategoryGroup = modal.querySelector('#custom-category-group');
+        const customCategoryInput = modal.querySelector('#budget-custom-category');
+
+        // Reset custom category field when opening modal
+        customCategoryInput.value = ''; 
+        customCategoryGroup.style.display = 'none';
+
     if (budgetData) {
         modal.querySelector('#budget-modal-title').textContent = 'Edit Budget';
         modal.querySelector('#budget-id').value = budgetData.id;
-        modal.querySelector('#budget-category').value = budgetData.category;
+            
+            // Check if the budgetData.category is one of the predefined options
+            const isPredefined = Array.from(categorySelect.options).some(opt => opt.value === budgetData.category && opt.value !== '__custom__');
+            if (isPredefined) {
+                categorySelect.value = budgetData.category;
+            } else {
+                // It's a custom category
+                categorySelect.value = '__custom__';
+                customCategoryInput.value = budgetData.category;
+                customCategoryGroup.style.display = 'block';
+            }
+            
         modal.querySelector('#budget-amount').value = budgetData.amount;
-        modal.querySelector('#budget-start-date').value = budgetData.startDate;
+            modal.querySelector('#budget-start-date').value = budgetData.start_date; // Ensure this is formatted YYYY-MM-DD
         modal.querySelector('#budget-period').value = budgetData.period;
         modal.querySelector('#budget-notes').value = budgetData.notes || '';
     } else {
         // Set default values for new budget
         modal.querySelector('#budget-modal-title').textContent = 'Create Budget';
         modal.querySelector('#budget-id').value = '';
-        modal.querySelector('#budget-category').value = '';
+             categorySelect.value = ''; // Default to "Select Category"
+             customCategoryInput.value = '';
+             customCategoryGroup.style.display = 'none';
         modal.querySelector('#budget-amount').value = '';
         modal.querySelector('#budget-start-date').value = formatDate(new Date());
         modal.querySelector('#budget-period').value = 'monthly';
         modal.querySelector('#budget-notes').value = '';
+        }
     }
     
     // Show the modal
@@ -1566,11 +1734,11 @@ function showGoalModal(goalData = null) {
     if (goalData) {
         modal.querySelector('#goal-modal-title').textContent = 'Edit Financial Goal';
         modal.querySelector('#goal-id').value = goalData.id;
-        modal.querySelector('#goal-title').value = goalData.title;
-        modal.querySelector('#goal-category').value = goalData.category;
-        modal.querySelector('#goal-target-amount').value = goalData.targetAmount;
-        modal.querySelector('#goal-current-amount').value = goalData.currentAmount;
-        modal.querySelector('#goal-target-date').value = goalData.targetDate;
+        modal.querySelector('#goal-title').value = goalData.title || goalData.name || '';
+        modal.querySelector('#goal-category').value = goalData.category || goalData.type || '';
+        modal.querySelector('#goal-target-amount').value = goalData.targetAmount || goalData.target_amount || '';
+        modal.querySelector('#goal-current-amount').value = goalData.currentAmount || goalData.current_amount || '';
+        modal.querySelector('#goal-target-date').value = formatDate(new Date(goalData.targetDate || goalData.deadline));
         modal.querySelector('#goal-description').value = goalData.description || '';
     } else {
         // Set default values for new goal
@@ -1601,109 +1769,34 @@ function closeGoalModal() {
     }
 }
 
-// Save goal
-function saveGoal() {
-    const form = document.getElementById('goal-form');
-    
-    if (form.checkValidity()) {
-        const goalId = document.getElementById('goal-id').value;
-        const title = document.getElementById('goal-title').value;
-        const category = document.getElementById('goal-category').value;
-        const targetAmount = document.getElementById('goal-target-amount').value;
-        const currentAmount = document.getElementById('goal-current-amount').value || '0';
-        const targetDate = document.getElementById('goal-target-date').value;
-        const description = document.getElementById('goal-description').value;
-        
-        const goalData = {
-            id: goalId || Date.now().toString(),
-            title,
-            category,
-            targetAmount,
-            currentAmount,
-            targetDate,
-            description
-        };
-        
-        // Here you would send the data to your API
-        console.log('Saving goal:', goalData);
-        
-        // For demo purposes, let's simulate a successful save
-        closeGoalModal();
-        
-        // Show success message
-        showNotification('Goal saved successfully', 'success');
-        
-        // Refresh goals (in a real app, this would fetch from API)
-        // For now, just reload the page after a short delay
-        setTimeout(() => {
-            switchTab('goals');
-        }, 1000);
-    } else {
-        // Trigger form validation
-        form.reportValidity();
-    }
-}
-
 // Edit goal
 function editGoal(id) {
     console.log('Edit goal:', id);
     
-    // In a real app, you would fetch the goal data from your API
-    // For demo purposes, let's use mock data
-    const mockGoals = {
-        "1": {
-            id: "1",
-            title: "Emergency Fund",
-            category: "savings",
-            targetAmount: "10000",
-            currentAmount: "6500",
-            targetDate: "2025-12-31",
-            description: "Build an emergency fund to cover 6 months of expenses."
-        },
-        "2": {
-            id: "2",
-            title: "New Car",
-            category: "automobile",
-            targetAmount: "25000",
-            currentAmount: "8200",
-            targetDate: "2026-06-30",
-            description: "Save for down payment on a new electric vehicle."
-        },
-        "3": {
-            id: "3",
-            title: "Vacation Fund",
-            category: "travel",
-            targetAmount: "3500",
-            currentAmount: "3500",
-            targetDate: "2025-05-15",
-            description: "Fund for summer vacation to Europe."
-        },
-        "4": {
-            id: "4",
-            title: "Home Down Payment",
-            category: "housing",
-            targetAmount: "80000",
-            currentAmount: "35000",
-            targetDate: "2028-07-31",
-            description: "Save for 20% down payment on first home."
-        },
-        "5": {
-            id: "5",
-            title: "Education Fund",
-            category: "education",
-            targetAmount: "15000",
-            currentAmount: "4200",
-            targetDate: "2026-12-31",
-            description: "Fund for professional certificate program."
-        }
-    };
-    
-    const goal = mockGoals[id];
-    if (goal) {
-        showGoalModal(goal);
+    // Fetch the goal data from the API
+    api.getGoal(id)
+        .then(response => {
+            if (response.status === 'success') {
+                // Normalize the goal data for the modal
+                const goalData = {
+                    id: response.data.id,
+                    title: response.data.name,
+                    category: response.data.type,
+                    targetAmount: response.data.target_amount,
+                    currentAmount: response.data.current_amount,
+                    targetDate: response.data.deadline,
+                    description: response.data.description
+                };
+                
+                showGoalModal(goalData);
     } else {
-        showNotification('Goal not found', 'error');
+                showNotification('Failed to fetch goal details', 'error');
     }
+        })
+        .catch(error => {
+            console.error('Error fetching goal:', error);
+            showNotification('Error fetching goal details', 'error');
+        });
 }
 
 // Delete goal
@@ -1711,15 +1804,19 @@ function deleteGoal(id) {
     console.log('Delete goal:', id);
     
     if (confirm('Are you sure you want to delete this goal?')) {
-        // In a real app, you would send a delete request to your API
-        // For demo purposes, let's simulate a successful delete
+        api.deleteGoal(id)
+            .then(response => {
+                if (response.status === 'success') {
         showNotification('Goal deleted successfully', 'success');
-        
-        // Refresh goals (in a real app, this would fetch from API)
-        // For now, just reload the page after a short delay
-        setTimeout(() => {
-            switchTab('goals');
-        }, 1000);
+                    loadGoals(); // Refresh the goals list
+                } else {
+                    showNotification('Failed to delete goal', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error deleting goal:', error);
+                showNotification('Error deleting goal', 'error');
+            });
     }
 }
 
@@ -2875,7 +2972,8 @@ function populateTransactionsTable(transactions) {
         const row = document.createElement('tr');
         const date = new Date(transaction.date);
         const formattedDate = date.toLocaleDateString();
-        const isExpense = transaction.amount < 0;
+        // Correctly determine if it's an expense based on the 'type' field
+        const isExpense = transaction.type === 'expense';
         
         row.innerHTML = `
             <td>${formattedDate}</td>
@@ -2920,19 +3018,19 @@ function updateTransactionSummary(transactions) {
     let expenses = 0;
     
     transactions.forEach(transaction => {
-        if (transaction.amount > 0) {
-            income += transaction.amount;
-        } else {
-            expenses += Math.abs(transaction.amount);
+        if (transaction.type === 'income') {
+            income += parseFloat(transaction.amount);
+        } else if (transaction.type === 'expense') {
+            expenses += Math.abs(parseFloat(transaction.amount));
         }
     });
     
     const balance = income - expenses;
     
-    // Update the summary elements if they exist
-    const incomeEl = document.querySelector('.summary-income .amount');
-    const expensesEl = document.querySelector('.summary-expenses .amount');
-    const balanceEl = document.querySelector('.summary-balance .amount');
+    // Update the summary elements in the Transactions tab
+    const incomeEl = document.querySelector('.transactions-summary .summary-card.income .summary-value');
+    const expensesEl = document.querySelector('.transactions-summary .summary-card.expenses .summary-value');
+    const balanceEl = document.querySelector('.transactions-summary .summary-card.balance .summary-value');
     
     if (incomeEl) incomeEl.textContent = formatCurrency(income);
     if (expensesEl) expensesEl.textContent = formatCurrency(expenses);
@@ -2954,87 +3052,99 @@ function populateBudgetsContainer(budgets) {
     
     // Check if we have budgets
     if (!budgets || budgets.length === 0) {
-        budgetsContainer.innerHTML = '<div class="no-data">No budgets found</div>';
+        budgetsContainer.innerHTML = '<div class="no-data">No budgets found. Create one!</div>';
         return;
     }
     
-    // Add each budget to the container
     budgets.forEach(budget => {
-        const spent = budget.spent || 0;
-        const percentage = (spent / budget.amount) * 100;
+        const spent = parseFloat(budget.spent || 0);
+        const amount = parseFloat(budget.amount);
+        const percentage = amount > 0 ? (spent / amount) * 100 : 0;
+        const isOver = spent > amount;
+        const isWarning = percentage >= 80 && percentage <= 100;
         
         const budgetItem = document.createElement('div');
         budgetItem.className = 'budget-category-item';
         budgetItem.dataset.category = budget.category.toLowerCase();
+        if (isOver) budgetItem.classList.add('danger');
+        else if (isWarning) budgetItem.classList.add('warning');
         
         budgetItem.innerHTML = `
-            <div class="category-info">
-                <div class="category-name">
+            <div class="category-details">
+                 <div class="category-icon ${budget.category.toLowerCase()}">
                     <i class="fas ${getCategoryIcon(budget.category)}"></i>
-                    <span>${budget.category}</span>
                 </div>
-                <div class="budget-progress">
-                    <div class="progress-bar">
-                        <div class="progress-fill ${percentage > 100 ? 'over' : percentage > 80 ? 'warning' : ''}" 
-                             style="width: ${Math.min(percentage, 100)}%"></div>
+                 <div class="category-info">
+                     <div class="category-name">${budget.category}</div>
+                     <div class="category-progress-bar">
+                         <div class="progress-fill" 
+                              style="width: ${Math.min(percentage, 100)}%; background-color: ${isOver ? 'var(--danger-color)' : isWarning ? 'var(--warning-color)' : 'var(--primary-color)'};">
                     </div>
-                    <div class="progress-numbers">
-                        <span class="spent">${formatCurrency(spent)}</span>
-                        <span class="separator">/</span>
-                        <span class="total">${formatCurrency(budget.amount)}</span>
+                     </div>
+                     <div class="category-amounts">
+                         <span class="amount-spent">${formatCurrency(spent)}</span>
+                         <span class="amount-separator">/</span>
+                         <span class="amount-total">${formatCurrency(amount)}</span>
                     </div>
                 </div>
             </div>
             <div class="category-actions">
-                <button class="btn-icon edit-budget" data-id="${budget.id}">
+                <button class="btn-icon edit-budget" data-id="${budget.id}" title="Edit Budget">
                     <i class="fas fa-edit"></i>
+                </button>
+                <button class="btn-icon delete-budget" data-id="${budget.id}" title="Delete Budget">
+                    <i class="fas fa-trash-alt"></i> 
                 </button>
             </div>
         `;
         
         budgetsContainer.appendChild(budgetItem);
     });
-    
-    // Add event listeners
-    document.querySelectorAll('.edit-budget').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const id = btn.getAttribute('data-id');
-            editBudget(id);
-        });
-    });
+    // Note: Event listeners are now handled by delegation in bindBudgetEvents
 }
 
-// Add placeholder implementation for updateBudgetSummary
+// Update updateBudgetSummary to use the 'spent' field
 function updateBudgetSummary(budgets) {
     console.log('Updating budget summary with:', budgets);
     
-    // Calculate totals
     let totalBudget = 0;
     let totalSpent = 0;
     
     budgets.forEach(budget => {
-        totalBudget += budget.amount;
-        totalSpent += (budget.spent || 0);
+        totalBudget += parseFloat(budget.amount);
+        totalSpent += parseFloat(budget.spent || 0);
     });
     
     const remaining = totalBudget - totalSpent;
-    const percentage = (totalSpent / totalBudget) * 100;
+    const percentage = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
     
-    // Update the summary elements if they exist
-    const totalEl = document.querySelector('.budget-total .amount');
-    const spentEl = document.querySelector('.budget-spent .amount');
-    const remainingEl = document.querySelector('.budget-remaining .amount');
-    const progressFill = document.querySelector('.budget-progress-fill');
+    // Update the summary elements
+    const totalEl = document.querySelector('.budget-summary .summary-card.total-budget .summary-value'); // Adjust selector if needed
+    const spentEl = document.querySelector('.budget-summary .summary-card.spent .summary-value');       // Adjust selector if needed
+    const remainingEl = document.querySelector('.budget-summary .summary-card.remaining .summary-value'); // Adjust selector if needed
+    const progressFill = document.querySelector('.budget-total-progress .progress-fill'); // Adjust selector if needed
+    const progressPercentageEl = document.querySelector('.budget-status .progress-percentage'); // Adjust selector if needed
+    const spentOverviewEl = document.querySelector('.budget-progress-overview .spent'); // Adjust selector if needed
+    const remainingOverviewEl = document.querySelector('.budget-progress-overview .remaining'); // Adjust selector if needed
     
     if (totalEl) totalEl.textContent = formatCurrency(totalBudget);
     if (spentEl) spentEl.textContent = formatCurrency(totalSpent);
     if (remainingEl) remainingEl.textContent = formatCurrency(remaining);
+    if (spentOverviewEl) spentOverviewEl.textContent = `Spent: ${formatCurrency(totalSpent)}`;
+    if (remainingOverviewEl) remainingOverviewEl.textContent = `Remaining: ${formatCurrency(remaining)}`;
+    if (progressPercentageEl) progressPercentageEl.textContent = `${percentage.toFixed(0)}%`;
+
     if (progressFill) {
         progressFill.style.width = `${Math.min(percentage, 100)}%`;
+        progressFill.classList.remove('warning', 'danger');
         if (percentage > 100) {
-            progressFill.classList.add('over');
-        } else if (percentage > 80) {
+            progressFill.classList.add('danger');
+             progressFill.style.backgroundColor = 'var(--danger-color)';
+        } else if (percentage >= 80) {
             progressFill.classList.add('warning');
+            progressFill.style.backgroundColor = 'var(--warning-color)';
+        } else {
+             progressFill.style.backgroundColor = 'var(--primary-color)';
         }
     }
 }
@@ -3060,44 +3170,74 @@ function populateGoalsList(goals) {
     
     // Add each goal to the list
     goals.forEach(goal => {
-        const percentage = (goal.currentAmount / goal.targetAmount) * 100;
+        // Handle both camelCase and snake_case property names
+        const currentAmount = goal.currentAmount || goal.current_amount || 0;
+        const targetAmount = goal.targetAmount || goal.target_amount || 0;
         const deadline = new Date(goal.deadline);
+        const percentage = (currentAmount / targetAmount) * 100 || 0;
         const formattedDeadline = deadline.toLocaleDateString();
+        const goalName = goal.name;
+        const goalType = goal.type;
+        const goalId = goal.id;
         
         const goalItem = document.createElement('div');
-        goalItem.className = 'goal-card';
+        goalItem.className = 'goal-item';
+        goalItem.dataset.id = goalId;
+        
+        const status = currentAmount >= targetAmount ? 'completed' : 'in-progress';
         
         goalItem.innerHTML = `
             <div class="goal-header">
-                <div class="goal-title">${goal.name}</div>
-                <div class="goal-actions">
-                    <button class="btn-icon edit-goal" data-id="${goal.id}">
-                        <i class="fas fa-edit"></i>
+                <div class="goal-title-section">
+                    <h3 class="goal-title">${goalName}</h3>
+                    <span class="goal-badge ${status}">${status === 'completed' ? 'Completed' : 'In Progress'}</span>
+                </div>
+                <div class="goal-actions-dropdown">
+                    <button class="btn-icon dropdown-toggle">
+                        <i class="fas fa-ellipsis-v"></i>
                     </button>
-                    <button class="btn-icon add-contribution" data-id="${goal.id}">
-                        <i class="fas fa-plus"></i>
+                    <div class="dropdown-menu">
+                        <button class="dropdown-item edit-goal" data-id="${goalId}">
+                            <i class="fas fa-edit"></i> Edit
+                        </button>
+                        <button class="dropdown-item delete-goal" data-id="${goalId}">
+                            <i class="fas fa-trash"></i> Delete
                     </button>
                 </div>
             </div>
+            </div>
+            
+            <div class="goal-details">
+                <div class="goal-amount">
+                    <span class="current">${formatCurrency(currentAmount)}</span>
+                    <span class="separator">of</span>
+                    <span class="target">${formatCurrency(targetAmount)}</span>
+                </div>
             <div class="goal-progress">
                 <div class="progress-bar">
                     <div class="progress-fill" style="width: ${percentage}%"></div>
                 </div>
-                <div class="progress-numbers">
-                    <span class="current">${formatCurrency(goal.currentAmount)}</span>
-                    <span class="separator">/</span>
-                    <span class="target">${formatCurrency(goal.targetAmount)}</span>
-                </div>
+                    <span class="progress-text">${Math.round(percentage)}% Complete</span>
             </div>
             <div class="goal-info">
-                <div class="goal-deadline">
+                    <div class="goal-date">
                     <i class="fas fa-calendar"></i>
-                    <span>${formattedDeadline}</span>
+                        <span>${status === 'completed' ? 'Completed' : 'Target'}: ${formattedDeadline}</span>
                 </div>
-                <div class="goal-type">
-                    <i class="fas ${getGoalTypeIcon(goal.type)}"></i>
-                    <span>${goal.type}</span>
+                    <div class="goal-category">
+                        <i class="fas ${getGoalTypeIcon(goalType)}"></i>
+                        <span>${goalType}</span>
                 </div>
+                </div>
+                ${goal.description ? `<p class="goal-description">${goal.description}</p>` : ''}
+                ${status === 'completed' ? 
+                    `<button class="btn-secondary view-history-btn" data-id="${goalId}">
+                        <i class="fas fa-history"></i> View History
+                    </button>` : 
+                    `<button class="btn-primary contribute-btn" data-id="${goalId}">
+                        <i class="fas fa-plus"></i> Add Contribution
+                    </button>`
+                }
             </div>
         `;
         
@@ -3112,40 +3252,75 @@ function populateGoalsList(goals) {
         });
     });
     
-    document.querySelectorAll('.add-contribution').forEach(btn => {
+    document.querySelectorAll('.delete-goal').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const id = btn.getAttribute('data-id');
+            deleteGoal(id);
+        });
+    });
+    
+    document.querySelectorAll('.contribute-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const id = btn.getAttribute('data-id');
             showContributionModal(id);
         });
     });
+    
+    document.querySelectorAll('.view-history-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const id = btn.getAttribute('data-id');
+            showGoalHistory(id);
+        });
+    });
+    
+    // Initialize dropdowns
+    document.querySelectorAll('.dropdown-toggle').forEach(toggle => {
+        toggle.addEventListener('click', function(e) {
+            e.stopPropagation();
+            this.nextElementSibling.classList.toggle('show');
+        });
+    });
+    
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', function() {
+        document.querySelectorAll('.dropdown-menu.show').forEach(menu => {
+            menu.classList.remove('show');
+        });
+    });
 }
 
-// Add placeholder implementation for updateGoalSummary
+// Update goal summary with proper handling of camelCase and snake_case
 function updateGoalSummary(goals) {
     console.log('Updating goal summary with:', goals);
     
     // Calculate totals
     let totalTarget = 0;
     let totalCurrent = 0;
+    let inProgressCount = 0;
+    let completedCount = 0;
     
     goals.forEach(goal => {
-        totalTarget += goal.targetAmount;
-        totalCurrent += goal.currentAmount;
+        const targetAmount = goal.targetAmount || goal.target_amount || 0;
+        const currentAmount = goal.currentAmount || goal.current_amount || 0;
+        
+        totalTarget += parseFloat(targetAmount);
+        totalCurrent += parseFloat(currentAmount);
+        
+        if (parseFloat(currentAmount) >= parseFloat(targetAmount)) {
+            completedCount++;
+        } else {
+            inProgressCount++;
+        }
     });
     
-    const remaining = totalTarget - totalCurrent;
-    const percentage = (totalCurrent / totalTarget) * 100;
+    // Update summary boxes in the UI
+    const totalGoalsEl = document.querySelector('.total-goals .summary-value');
+    const inProgressEl = document.querySelector('.in-progress .summary-value');
+    const completedEl = document.querySelector('.completed .summary-value');
     
-    // Update the summary elements if they exist
-    const targetEl = document.querySelector('.goals-target .amount');
-    const currentEl = document.querySelector('.goals-current .amount');
-    const remainingEl = document.querySelector('.goals-remaining .amount');
-    const progressFill = document.querySelector('.goals-progress-fill');
-    
-    if (targetEl) targetEl.textContent = formatCurrency(totalTarget);
-    if (currentEl) currentEl.textContent = formatCurrency(totalCurrent);
-    if (remainingEl) remainingEl.textContent = formatCurrency(remaining);
-    if (progressFill) progressFill.style.width = `${percentage}%`;
+    if (totalGoalsEl) totalGoalsEl.textContent = goals.length;
+    if (inProgressEl) inProgressEl.textContent = inProgressCount;
+    if (completedEl) completedEl.textContent = completedCount;
 }
 
 // Add placeholder implementation for populateInsightsContainer
@@ -3385,44 +3560,68 @@ function parseCSV(csvString) {
     return transactions;
 }
 
-// Save transactions to localStorage
-function saveTransactions(newTransactions) {
-    let existingTransactions = [];
-    const storedTransactions = localStorage.getItem('transactions');
-    
-    if (storedTransactions) {
-        existingTransactions = JSON.parse(storedTransactions);
-    }
-    
-    // Combine existing and new transactions
-    const updatedTransactions = [...existingTransactions, ...newTransactions];
-    
-    // Sort transactions by date (newest first)
-    updatedTransactions.sort((a, b) => new Date(b.date) - new Date(a.date));
-    
-    localStorage.setItem('transactions', JSON.stringify(updatedTransactions));
-}
-
-// Update dashboard with new transaction data
-function updateDashboardWithNewTransactions() {
-    // Refresh transaction list
-    const transactionList = document.querySelector('.transactions-list');
-    if (transactionList) {
-        populateTransactionsList();
-    }
-    
-    // Refresh charts
-    updateChartData();
-    
-    // Update summary cards
-    updateFinancialSummary();
-    
-    // Show success notification
-    showNotification('Transactions imported successfully!', 'success');
-}
-
 // Initialize CSV Import
 document.addEventListener('DOMContentLoaded', function() {
     // ... existing code ...
     setupCSVImportModal();
+});
+
+// ... existing code ...
+function updateSpendingChartFromTransactions(transactions) {
+    // Only consider expenses
+    const categoryTotals = {};
+    transactions.forEach(tx => {
+        if (tx.type === 'expense') {
+            const cat = tx.category || 'Other';
+            categoryTotals[cat] = (categoryTotals[cat] || 0) + Math.abs(parseFloat(tx.amount));
+        }
+    });
+    const labels = Object.keys(categoryTotals);
+    const data = Object.values(categoryTotals);
+    if (window.spendingChart) {
+        window.spendingChart.data.labels = labels;
+        window.spendingChart.data.datasets[0].data = data;
+        window.spendingChart.update();
+    }
+}
+
+function updateRecentTransactionsFromDashboard(transactions) {
+    // Sort by date descending
+    const sorted = [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date));
+    const recent = sorted.slice(0, 3);
+    const container = document.querySelector('#overview .transactions-list');
+    if (!container) return;
+    container.innerHTML = '';
+    if (recent.length === 0) {
+        container.innerHTML = '<div class="no-data">No recent transactions</div>';
+        return;
+    }
+    recent.forEach(tx => {
+        const item = document.createElement('div');
+        item.className = 'recent-transaction-item';
+        const icon = getCategoryIcon(tx.category);
+        const isExpense = tx.type === 'expense' || parseFloat(tx.amount) < 0;
+        const formattedDate = new Date(tx.date).toLocaleDateString();
+        item.innerHTML = `
+            <div class="transaction-icon ${tx.category}"><i class="fas ${icon}"></i></div>
+            <div class="transaction-details">
+                <div class="transaction-title">${tx.description}</div>
+                <div class="transaction-date">${formattedDate}</div>
+            </div>
+            <div class="transaction-amount ${isExpense ? 'expense' : 'income'}">${formatCurrency(tx.amount)}</div>
+        `;
+        container.appendChild(item);
+    });
+}
+
+// Update View All Transactions button to use hash link
+document.addEventListener('DOMContentLoaded', function() {
+    const viewAllLink = document.querySelector('.view-all-link');
+    if (viewAllLink) {
+        viewAllLink.setAttribute('href', '#transactions');
+        viewAllLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            switchTab('transactions');
+        });
+    }
 }); 

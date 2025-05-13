@@ -451,7 +451,7 @@
                             </div>
                             <div class="stat-info">
                                 <h3>Total Balance</h3>
-                                <div class="stat-value">$14,250.80</div>
+                                <div class="stat-value"></div>
                                 <div class="stat-change positive">+2.5% from last month</div>
                             </div>
                         </div>
@@ -461,7 +461,7 @@
                             </div>
                             <div class="stat-info">
                                 <h3>Income</h3>
-                                <div class="stat-value">$3,250.00</div>
+                                <div class="stat-value"></div>
                                 <div class="stat-change positive">+12% from last month</div>
                             </div>
                         </div>
@@ -471,7 +471,7 @@
                             </div>
                             <div class="stat-info">
                                 <h3>Expenses</h3>
-                                <div class="stat-value">$1,875.50</div>
+                                <div class="stat-value"></div>
                                 <div class="stat-change negative">+8.3% from last month</div>
                             </div>
                         </div>
@@ -481,7 +481,7 @@
                             </div>
                             <div class="stat-info">
                                 <h3>Savings</h3>
-                                <div class="stat-value">$1,374.50</div>
+                                <div class="stat-value"></div>
                                 <div class="stat-change positive">+18% from last month</div>
                             </div>
                         </div>
@@ -519,56 +519,7 @@
                     
                     <div class="dashboard-card">
                         <div class="transactions-list">
-                            <div class="transaction-item">
-                                <div class="transaction-icon shopping">
-                                    <i class="fas fa-shopping-bag"></i>
-                                </div>
-                                <div class="transaction-details">
-                                    <div class="transaction-title">Grocery Shopping</div>
-                                    <div class="transaction-date">May 15, 2023</div>
-                                </div>
-                                <div class="transaction-amount expense">-$85.40</div>
-                            </div>
-                            <div class="transaction-item">
-                                <div class="transaction-icon salary">
-                                    <i class="fas fa-briefcase"></i>
-                                </div>
-                                <div class="transaction-details">
-                                    <div class="transaction-title">Salary Deposit</div>
-                                    <div class="transaction-date">May 1, 2023</div>
-                                </div>
-                                <div class="transaction-amount income">+$3,250.00</div>
-                            </div>
-                            <div class="transaction-item">
-                                <div class="transaction-icon bills">
-                                    <i class="fas fa-file-invoice-dollar"></i>
-                                </div>
-                                <div class="transaction-details">
-                                    <div class="transaction-title">Electricity Bill</div>
-                                    <div class="transaction-date">Apr 28, 2023</div>
-                                </div>
-                                <div class="transaction-amount expense">-$94.20</div>
-                            </div>
-                            <div class="transaction-item">
-                                <div class="transaction-icon entertainment">
-                                    <i class="fas fa-film"></i>
-                                </div>
-                                <div class="transaction-details">
-                                    <div class="transaction-title">Movie Tickets</div>
-                                    <div class="transaction-date">Apr 25, 2023</div>
-                                </div>
-                                <div class="transaction-amount expense">-$24.99</div>
-                            </div>
-                            <div class="transaction-item">
-                                <div class="transaction-icon transfer">
-                                    <i class="fas fa-exchange-alt"></i>
-                                </div>
-                                <div class="transaction-details">
-                                    <div class="transaction-title">Transfer to Savings</div>
-                                    <div class="transaction-date">Apr 20, 2023</div>
-                                </div>
-                                <div class="transaction-amount expense">-$500.00</div>
-                            </div>
+                            <!-- Transactions will be dynamically loaded from the database -->
                         </div>
                         <div class="view-all">
                             <a href="#" data-target="transactions" class="view-all-link">View All Transactions</a>
@@ -733,140 +684,20 @@
                 </div>
                 
                 <div class="transactions-container">
-                    <div class="transactions-table-header">
-                        <div class="transactions-table-cell date-cell">Date</div>
-                        <div class="transactions-table-cell description-cell">Description</div>
-                        <div class="transactions-table-cell category-cell">Category</div>
-                        <div class="transactions-table-cell amount-cell">Amount</div>
-                        <div class="transactions-table-cell actions-cell">Actions</div>
-                    </div>
-                    
-                    <div class="transactions-list-scrollable">
-                        <div class="transaction-row">
-                            <div class="transactions-table-cell date-cell">Jul 20, 2025</div>
-                            <div class="transactions-table-cell description-cell">
-                                <div class="transaction-icon salary">
-                                    <i class="fas fa-briefcase"></i>
-                                </div>
-                                <div class="transaction-info">
-                                    <div class="transaction-title">Salary Deposit</div>
-                                    <div class="transaction-memo">Monthly salary</div>
-                                </div>
-                            </div>
-                            <div class="transactions-table-cell category-cell">
-                                <span class="category-badge income">Income</span>
-                            </div>
-                            <div class="transactions-table-cell amount-cell income">+$2,920.00</div>
-                            <div class="transactions-table-cell actions-cell">
-                                <button class="btn-icon edit-transaction" data-id="1">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button class="btn-icon delete-transaction" data-id="1">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div class="transaction-row">
-                            <div class="transactions-table-cell date-cell">Jul 19, 2025</div>
-                            <div class="transactions-table-cell description-cell">
-                                <div class="transaction-icon shopping">
-                                    <i class="fas fa-shopping-bag"></i>
-                                </div>
-                                <div class="transaction-info">
-                                    <div class="transaction-title">Whole Foods Market</div>
-                                    <div class="transaction-memo">Weekly groceries</div>
-                                </div>
-                            </div>
-                            <div class="transactions-table-cell category-cell">
-                                <span class="category-badge groceries">Groceries</span>
-                            </div>
-                            <div class="transactions-table-cell amount-cell expense">-$84.32</div>
-                            <div class="transactions-table-cell actions-cell">
-                                <button class="btn-icon edit-transaction" data-id="2">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button class="btn-icon delete-transaction" data-id="2">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div class="transaction-row">
-                            <div class="transactions-table-cell date-cell">Jul 18, 2025</div>
-                            <div class="transactions-table-cell description-cell">
-                                <div class="transaction-icon bills">
-                                    <i class="fas fa-file-invoice-dollar"></i>
-                                </div>
-                                <div class="transaction-info">
-                                    <div class="transaction-title">Electricity Bill</div>
-                                    <div class="transaction-memo">Monthly utility payment</div>
-                                </div>
-                            </div>
-                            <div class="transactions-table-cell category-cell">
-                                <span class="category-badge utilities">Utilities</span>
-                            </div>
-                            <div class="transactions-table-cell amount-cell expense">-$145.86</div>
-                            <div class="transactions-table-cell actions-cell">
-                                <button class="btn-icon edit-transaction" data-id="3">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button class="btn-icon delete-transaction" data-id="3">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div class="transaction-row">
-                            <div class="transactions-table-cell date-cell">Jul 15, 2025</div>
-                            <div class="transactions-table-cell description-cell">
-                                <div class="transaction-icon entertainment">
-                                    <i class="fas fa-film"></i>
-                                </div>
-                                <div class="transaction-info">
-                                    <div class="transaction-title">Netflix Subscription</div>
-                                    <div class="transaction-memo">Monthly subscription</div>
-                                </div>
-                            </div>
-                            <div class="transactions-table-cell category-cell">
-                                <span class="category-badge entertainment">Entertainment</span>
-                            </div>
-                            <div class="transactions-table-cell amount-cell expense">-$15.99</div>
-                            <div class="transactions-table-cell actions-cell">
-                                <button class="btn-icon edit-transaction" data-id="4">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button class="btn-icon delete-transaction" data-id="4">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div class="transaction-row">
-                            <div class="transactions-table-cell date-cell">Jul 14, 2025</div>
-                            <div class="transactions-table-cell description-cell">
-                                <div class="transaction-icon dining">
-                                    <i class="fas fa-utensils"></i>
-                                </div>
-                                <div class="transaction-info">
-                                    <div class="transaction-title">Cheesecake Factory</div>
-                                    <div class="transaction-memo">Dinner with friends</div>
-                                </div>
-                            </div>
-                            <div class="transactions-table-cell category-cell">
-                                <span class="category-badge dining">Dining Out</span>
-                            </div>
-                            <div class="transactions-table-cell amount-cell expense">-$72.45</div>
-                            <div class="transactions-table-cell actions-cell">
-                                <button class="btn-icon edit-transaction" data-id="5">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button class="btn-icon delete-transaction" data-id="5">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                  <table class="transactions-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Description</th>
+                        <th>Category</th>
+                        <th>Amount</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <!-- Transactions will be dynamically loaded here -->
+                    </tbody>
+                  </table>
                 </div>
                 
                 <div class="transactions-pagination">
@@ -1220,260 +1051,7 @@
                 
                 <div class="goals-container">
                     <div class="goals-list">
-                        <!-- Goal Item 1 -->
-                        <div class="goal-item" data-id="1">
-                            <div class="goal-header">
-                                <div class="goal-title-section">
-                                    <h3 class="goal-title">Emergency Fund</h3>
-                                    <span class="goal-badge in-progress">In Progress</span>
-                                </div>
-                                <div class="goal-actions-dropdown">
-                                    <button class="btn-icon dropdown-toggle">
-                                        <i class="fas fa-ellipsis-v"></i>
-                                    </button>
-                                    <div class="dropdown-menu">
-                                        <button class="dropdown-item edit-goal" data-id="1">
-                                            <i class="fas fa-edit"></i> Edit
-                                        </button>
-                                        <button class="dropdown-item delete-goal" data-id="1">
-                                            <i class="fas fa-trash"></i> Delete
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="goal-details">
-                                <div class="goal-amount">
-                                    <span class="current">$6,500</span>
-                                    <span class="separator">of</span>
-                                    <span class="target">$10,000</span>
-                                </div>
-                                <div class="goal-progress">
-                                    <div class="progress-bar">
-                                        <div class="progress-fill" style="width: 65%"></div>
-                                    </div>
-                                    <span class="progress-text">65% Complete</span>
-                                </div>
-                                <div class="goal-info">
-                                    <div class="goal-date">
-                                        <i class="fas fa-calendar"></i>
-                                        <span>Target: Dec 2025</span>
-                                    </div>
-                                    <div class="goal-category">
-                                        <i class="fas fa-tag"></i>
-                                        <span>Savings</span>
-                                    </div>
-                                </div>
-                                <p class="goal-description">Build an emergency fund to cover 6 months of expenses.</p>
-                                <button class="btn-primary contribute-btn" data-id="1">
-                                    <i class="fas fa-plus"></i> Add Contribution
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <!-- Goal Item 2 -->
-                        <div class="goal-item" data-id="2">
-                            <div class="goal-header">
-                                <div class="goal-title-section">
-                                    <h3 class="goal-title">New Car</h3>
-                                    <span class="goal-badge in-progress">In Progress</span>
-                                </div>
-                                <div class="goal-actions-dropdown">
-                                    <button class="btn-icon dropdown-toggle">
-                                        <i class="fas fa-ellipsis-v"></i>
-                                    </button>
-                                    <div class="dropdown-menu">
-                                        <button class="dropdown-item edit-goal" data-id="2">
-                                            <i class="fas fa-edit"></i> Edit
-                                        </button>
-                                        <button class="dropdown-item delete-goal" data-id="2">
-                                            <i class="fas fa-trash"></i> Delete
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="goal-details">
-                                <div class="goal-amount">
-                                    <span class="current">$8,200</span>
-                                    <span class="separator">of</span>
-                                    <span class="target">$25,000</span>
-                                </div>
-                                <div class="goal-progress">
-                                    <div class="progress-bar">
-                                        <div class="progress-fill" style="width: 32%"></div>
-                                    </div>
-                                    <span class="progress-text">32% Complete</span>
-                                </div>
-                                <div class="goal-info">
-                                    <div class="goal-date">
-                                        <i class="fas fa-calendar"></i>
-                                        <span>Target: Jun 2026</span>
-                                    </div>
-                                    <div class="goal-category">
-                                        <i class="fas fa-tag"></i>
-                                        <span>Automobile</span>
-                                    </div>
-                                </div>
-                                <p class="goal-description">Save for down payment on a new electric vehicle.</p>
-                                <button class="btn-primary contribute-btn" data-id="2">
-                                    <i class="fas fa-plus"></i> Add Contribution
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <!-- Goal Item 3 -->
-                        <div class="goal-item" data-id="3">
-                            <div class="goal-header">
-                                <div class="goal-title-section">
-                                    <h3 class="goal-title">Vacation Fund</h3>
-                                    <span class="goal-badge completed">Completed</span>
-                                </div>
-                                <div class="goal-actions-dropdown">
-                                    <button class="btn-icon dropdown-toggle">
-                                        <i class="fas fa-ellipsis-v"></i>
-                                    </button>
-                                    <div class="dropdown-menu">
-                                        <button class="dropdown-item edit-goal" data-id="3">
-                                            <i class="fas fa-edit"></i> Edit
-                                        </button>
-                                        <button class="dropdown-item delete-goal" data-id="3">
-                                            <i class="fas fa-trash"></i> Delete
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="goal-details">
-                                <div class="goal-amount">
-                                    <span class="current">$3,500</span>
-                                    <span class="separator">of</span>
-                                    <span class="target">$3,500</span>
-                                </div>
-                                <div class="goal-progress">
-                                    <div class="progress-bar">
-                                        <div class="progress-fill" style="width: 100%"></div>
-                                    </div>
-                                    <span class="progress-text">100% Complete</span>
-                                </div>
-                                <div class="goal-info">
-                                    <div class="goal-date">
-                                        <i class="fas fa-calendar"></i>
-                                        <span>Completed: May 2025</span>
-                                    </div>
-                                    <div class="goal-category">
-                                        <i class="fas fa-tag"></i>
-                                        <span>Travel</span>
-                                    </div>
-                                </div>
-                                <p class="goal-description">Fund for summer vacation to Europe.</p>
-                                <button class="btn-secondary view-history-btn" data-id="3">
-                                    <i class="fas fa-history"></i> View History
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <!-- Goal Item 4 -->
-                        <div class="goal-item" data-id="4">
-                            <div class="goal-header">
-                                <div class="goal-title-section">
-                                    <h3 class="goal-title">Home Down Payment</h3>
-                                    <span class="goal-badge in-progress">In Progress</span>
-                                </div>
-                                <div class="goal-actions-dropdown">
-                                    <button class="btn-icon dropdown-toggle">
-                                        <i class="fas fa-ellipsis-v"></i>
-                                    </button>
-                                    <div class="dropdown-menu">
-                                        <button class="dropdown-item edit-goal" data-id="4">
-                                            <i class="fas fa-edit"></i> Edit
-                                        </button>
-                                        <button class="dropdown-item delete-goal" data-id="4">
-                                            <i class="fas fa-trash"></i> Delete
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="goal-details">
-                                <div class="goal-amount">
-                                    <span class="current">$35,000</span>
-                                    <span class="separator">of</span>
-                                    <span class="target">$80,000</span>
-                                </div>
-                                <div class="goal-progress">
-                                    <div class="progress-bar">
-                                        <div class="progress-fill" style="width: 44%"></div>
-                                    </div>
-                                    <span class="progress-text">44% Complete</span>
-                                </div>
-                                <div class="goal-info">
-                                    <div class="goal-date">
-                                        <i class="fas fa-calendar"></i>
-                                        <span>Target: Jul 2028</span>
-                                    </div>
-                                    <div class="goal-category">
-                                        <i class="fas fa-tag"></i>
-                                        <span>Housing</span>
-                                    </div>
-                                </div>
-                                <p class="goal-description">Save for 20% down payment on first home.</p>
-                                <button class="btn-primary contribute-btn" data-id="4">
-                                    <i class="fas fa-plus"></i> Add Contribution
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <!-- Goal Item 5 -->
-                        <div class="goal-item" data-id="5">
-                            <div class="goal-header">
-                                <div class="goal-title-section">
-                                    <h3 class="goal-title">Education Fund</h3>
-                                    <span class="goal-badge in-progress">In Progress</span>
-                                </div>
-                                <div class="goal-actions-dropdown">
-                                    <button class="btn-icon dropdown-toggle">
-                                        <i class="fas fa-ellipsis-v"></i>
-                                    </button>
-                                    <div class="dropdown-menu">
-                                        <button class="dropdown-item edit-goal" data-id="5">
-                                            <i class="fas fa-edit"></i> Edit
-                                        </button>
-                                        <button class="dropdown-item delete-goal" data-id="5">
-                                            <i class="fas fa-trash"></i> Delete
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="goal-details">
-                                <div class="goal-amount">
-                                    <span class="current">$4,200</span>
-                                    <span class="separator">of</span>
-                                    <span class="target">$15,000</span>
-                                </div>
-                                <div class="goal-progress">
-                                    <div class="progress-bar">
-                                        <div class="progress-fill" style="width: 28%"></div>
-                                    </div>
-                                    <span class="progress-text">28% Complete</span>
-                                </div>
-                                <div class="goal-info">
-                                    <div class="goal-date">
-                                        <i class="fas fa-calendar"></i>
-                                        <span>Target: Dec 2026</span>
-                                    </div>
-                                    <div class="goal-category">
-                                        <i class="fas fa-tag"></i>
-                                        <span>Education</span>
-                                    </div>
-                                </div>
-                                <p class="goal-description">Fund for professional certificate program.</p>
-                                <button class="btn-primary contribute-btn" data-id="5">
-                                    <i class="fas fa-plus"></i> Add Contribution
-                                </button>
-                            </div>
-                        </div>
+                        <!-- Goals will be loaded dynamically here -->
                     </div>
                     
                     <div class="goals-insights">

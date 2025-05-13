@@ -431,4 +431,121 @@ router.get('/recreate-db', async (req, res) => {
     }
 });
 
+// Update user profile
+router.put('/update-profile', authenticateToken, [
+    body('name').optional().trim().notEmpty().withMessage('Name cannot be empty'),
+    body('email').optional().isEmail().withMessage('Please enter a valid email')
+], async (req, res) => {
+    try {
+        // Check for validation errors
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ status: 'error', message: errors.array()[0].msg });
+        }
+
+        const userId = req.user.id;
+        const { name, email } = req.body;
+
+        // Build update query
+        let updateFields = [];
+        let params = [];
+
+        if (name) {
+            updateFields.push('name = ?');
+            params.push(name);
+        }
+
+        if (email) {
+            // Check if email already exists (but is not the user's current email)
+            const existingUser = await db.get('SELECT id FROM users WHERE email = ? AND id != ?', [email, userId]);
+            if (existingUser) {
+                return res.status(400).json({ status: 'error', message: 'Email already in use' });
+            }
+            
+            updateFields.push('email = ?');
+            params.push(email);
+        }
+
+        // Don't proceed if no fields to update
+        if (updateFields.length === 0) {
+            return res.status(400).json({ status: 'error', message: 'No fields to update' });
+        }
+
+        // Add userId to params
+        params.push(userId);
+
+        // Update user
+        await db.run(
+            `UPDATE users SET ${updateFields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+            params
+        );
+
+        // Get updated user
+        const updatedUser = await db.get(
+            'SELECT id, name, email, created_at FROM users WHERE id = ?',
+            [userId]
+        );
+
+        res.json({
+            status: 'success',
+            data: updatedUser
+        });
+    } catch (error) {
+        console.error('Error updating profile:', error);
+        res.status(500).json({ status: 'error', message: 'Server error' });
+    }
+});
+
+// Update user password
+router.put('/update-password', authenticateToken, [
+    body('currentPassword').notEmpty().withMessage('Current password is required'),
+    body('newPassword')
+        .isLength({ min: 6 })
+        .withMessage('Password must be at least 6 characters long')
+        .matches(/\d/)
+        .withMessage('Password must contain at least one number')
+        .matches(/[a-z]/)
+        .withMessage('Password must contain at least one lowercase letter')
+        .matches(/[A-Z]/)
+        .withMessage('Password must contain at least one uppercase letter')
+], async (req, res) => {
+    try {
+        // Check for validation errors
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ status: 'error', message: errors.array()[0].msg });
+        }
+
+        const userId = req.user.id;
+        const { currentPassword, newPassword } = req.body;
+
+        // Get user with password
+        const user = await db.get('SELECT * FROM users WHERE id = ?', [userId]);
+
+        // Verify current password
+        const isValidPassword = await bcrypt.compare(currentPassword, user.password);
+        if (!isValidPassword) {
+            return res.status(401).json({ status: 'error', message: 'Current password is incorrect' });
+        }
+
+        // Hash new password
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+        // Update password
+        await db.run(
+            'UPDATE users SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+            [hashedPassword, userId]
+        );
+
+        res.json({
+            status: 'success',
+            message: 'Password updated successfully'
+        });
+    } catch (error) {
+        console.error('Error updating password:', error);
+        res.status(500).json({ status: 'error', message: 'Server error' });
+    }
+});
+
 module.exports = router; 

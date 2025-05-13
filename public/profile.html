@@ -6,6 +6,8 @@
     <title>User Profile - Finance Tracker</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="css/styles.css">
+    <script src="js/auth.js" defer></script>
+    <script src="js/api.js" defer></script>
     <script src="js/profile.js" defer></script>
     <style>
         :root {
@@ -188,27 +190,6 @@
             font-size: 36px;
             font-weight: bold;
             flex-shrink: 0;
-            position: relative;
-        }
-        
-        .avatar-upload {
-            position: absolute;
-            bottom: 0;
-            right: 0;
-            width: 30px;
-            height: 30px;
-            background-color: var(--primary-color);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-        }
-        
-        .avatar-upload i {
-            color: white;
-            font-size: 14px;
         }
         
         .profile-info {
@@ -342,199 +323,44 @@
             background-color: #e2e8f0;
         }
         
-        /* Security toggle switches */
-        .security-options {
-            margin-top: 20px;
-        }
-        
-        .security-option {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 0;
-            border-bottom: 1px solid #e2e8f0;
-        }
-        
-        .security-option:last-child {
-            border-bottom: none;
-        }
-        
-        .option-label {
-            font-weight: 500;
-            color: #4a5568;
-        }
-        
-        .option-description {
-            font-size: 13px;
-            color: #718096;
-            margin-top: 4px;
-        }
-        
-        .toggle-switch {
-            position: relative;
-            display: inline-block;
-            width: 46px;
-            height: 24px;
-        }
-        
-        .toggle-switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-        
-        .toggle-slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #cbd5e0;
-            transition: .4s;
-            border-radius: 24px;
-        }
-        
-        .toggle-slider:before {
-            position: absolute;
-            content: "";
-            height: 18px;
-            width: 18px;
-            left: 3px;
-            bottom: 3px;
-            background-color: white;
-            transition: .4s;
-            border-radius: 50%;
-        }
-        
-        input:checked + .toggle-slider {
-            background-color: var(--primary-color);
-        }
-        
-        input:checked + .toggle-slider:before {
-            transform: translateX(22px);
-        }
-        
-        /* User Stats */
-        .user-stats {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 15px;
-            margin-bottom: 30px;
-        }
-        
-        .stat-item {
-            text-align: center;
-            background-color: rgba(49, 130, 206, 0.1);
-            padding: 15px;
-            border-radius: 8px;
-        }
-        
-        .stat-value {
-            font-size: 24px;
-            font-weight: 700;
-            color: var(--primary-color);
-        }
-        
-        .stat-label {
-            font-size: 14px;
-            color: #718096;
-            margin-top: 5px;
-        }
-        
-        /* Connected Accounts */
-        .connected-accounts {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-        
-        .account-item {
+        /* Notifications */
+        .notification {
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 16px;
             display: flex;
             align-items: center;
-            gap: 15px;
-            padding: 15px;
-            border-radius: 8px;
-            border: 1px solid #e2e8f0;
-            background-color: #f7fafc;
+            gap: 12px;
         }
         
-        .account-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 8px;
-            background-color: rgba(49, 130, 206, 0.1);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
+        .notification.success {
+            background-color: #c6f6d5;
+            color: #276749;
+            border-left: 4px solid #38a169;
         }
         
-        .account-icon i {
-            color: var(--primary-color);
+        .notification.error {
+            background-color: #fed7d7;
+            color: #9b2c2c;
+            border-left: 4px solid #e53e3e;
+        }
+        
+        .notification.info {
+            background-color: #bee3f8;
+            color: #2c5282;
+            border-left: 4px solid #3182ce;
+        }
+        
+        .notification i {
             font-size: 18px;
         }
         
-        .account-details {
+        .notification span {
             flex: 1;
         }
         
-        .account-details h4 {
-            margin: 0 0 5px 0;
-            font-weight: 500;
-            color: #2d3748;
-        }
-        
-        .account-details p {
-            font-size: 13px;
-            color: #718096;
-            margin: 0;
-        }
-        
-        .btn-disconnect {
-            color: #e53e3e;
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 13px;
-            padding: 5px 10px;
-        }
-        
-        /* Responsive styles */
-        @media (max-width: 1024px) {
-            .profile-sections {
-                grid-template-columns: 1fr;
-            }
-        }
-        
-        @media (max-width: 768px) {
-            .sidebar {
-                width: 60px;
-                padding: 10px;
-            }
-            
-            .logo h1, .nav-link span {
+        .notification.hidden {
                 display: none;
-            }
-            
-            .nav-link i {
-                margin-right: 0;
-            }
-            
-            .main-content {
-                margin-left: 60px;
-            }
-            
-            .profile-header {
-                flex-direction: column;
-                align-items: center;
-                text-align: center;
-                padding: 20px;
-            }
-            
-            .btn-edit-profile {
-                margin-top: 10px;
-            }
         }
     </style>
 </head>
@@ -543,7 +369,7 @@
         <!-- Sidebar -->
         <nav class="sidebar">
             <div class="logo">
-                <i class="fas fa-chart-line"></i>
+                <i class="fas fa-chart-pie"></i>
                 <h1>Finance Tracker</h1>
             </div>
             <ul class="nav-menu">
@@ -577,12 +403,6 @@
                         <span>AI Insights</span>
                     </a>
                 </li>
-                <li class="nav-item">
-                    <a href="index.html#settings" class="nav-link">
-                        <i class="fas fa-cog"></i>
-                        <span>Settings</span>
-                    </a>
-                </li>
             </ul>
         </nav>
 
@@ -593,7 +413,7 @@
                 <div style="display: flex; align-items: center; gap: 20px;">
                     <div class="user-info">
                         <div class="user-avatar" id="profile-avatar">T</div>
-                        <div class="user-name" id="profile-name">testing</div>
+                        <div class="user-name" id="profile-name">Testing</div>
                     </div>
                     <button class="btn-logout" id="logout-btn" onclick="auth.logout()">
                         <i class="fas fa-sign-out-alt"></i>
@@ -603,20 +423,14 @@
             </div>
 
             <div class="profile-container">
+                <!-- Notifications -->
+                <div id="notification" class="notification hidden"></div>
+                
                 <div class="profile-header">
-                    <div class="profile-avatar" id="large-avatar">
-                        T
-                        <div class="avatar-upload">
-                            <i class="fas fa-camera"></i>
-                        </div>
-                    </div>
+                    <div class="profile-avatar" id="large-avatar">T</div>
                     <div class="profile-info">
                         <h1 id="profile-full-name">Testing User</h1>
                         <p id="profile-email">testing@example.com</p>
-                        <button class="btn-edit-profile">
-                            <i class="fas fa-edit"></i>
-                            Edit Profile
-                        </button>
                     </div>
                 </div>
 
@@ -625,23 +439,15 @@
                         <h2><i class="fas fa-user"></i> Personal Information</h2>
                         <form id="profile-form">
                             <div class="form-group">
-                                <label for="firstName">First Name</label>
-                                <input type="text" id="firstName" name="firstName" value="Testing">
-                            </div>
-                            <div class="form-group">
-                                <label for="lastName">Last Name</label>
-                                <input type="text" id="lastName" name="lastName" value="User">
+                                <label for="name">Name</label>
+                                <input type="text" id="name" name="name" placeholder="Enter your name">
                             </div>
                             <div class="form-group">
                                 <label for="email">Email</label>
-                                <input type="email" id="email" name="email" value="testing@example.com">
-                            </div>
-                            <div class="form-group">
-                                <label for="phone">Phone Number</label>
-                                <input type="tel" id="phone" name="phone" value="+1 (555) 123-4567">
+                                <input type="email" id="email" name="email" placeholder="Enter your email">
                             </div>
                             <div class="form-actions">
-                                <button type="button" class="btn-cancel">Cancel</button>
+                                <button type="button" class="btn-cancel" id="profile-cancel">Cancel</button>
                                 <button type="submit" class="btn-save">Save Changes</button>
                             </div>
                         </form>
@@ -649,6 +455,7 @@
                     
                     <div class="profile-section">
                         <h2><i class="fas fa-shield-alt"></i> Security</h2>
+                        <form id="password-form">
                         <div class="form-group">
                             <label for="currentPassword">Current Password</label>
                             <input type="password" id="currentPassword" name="currentPassword" placeholder="Enter current password">
@@ -662,241 +469,14 @@
                             <input type="password" id="confirmPassword" name="confirmPassword" placeholder="Confirm new password">
                         </div>
                         <div class="form-actions">
-                            <button type="button" class="btn-cancel">Cancel</button>
-                            <button type="button" class="btn-save">Update Password</button>
-                        </div>
-                        
-                        <h2 style="margin-top: 30px;"><i class="fas fa-lock"></i> Security Options</h2>
-                        <div class="security-options">
-                            <div class="security-option">
-                                <div>
-                                    <div class="option-label">Two-Factor Authentication</div>
-                                    <div class="option-description">Add an extra layer of security to your account</div>
-                                </div>
-                                <label class="toggle-switch">
-                                    <input type="checkbox">
-                                    <span class="toggle-slider"></span>
-                                </label>
+                                <button type="button" class="btn-cancel" id="password-cancel">Cancel</button>
+                                <button type="submit" class="btn-save">Update Password</button>
                             </div>
-                            <div class="security-option">
-                                <div>
-                                    <div class="option-label">Email Notifications</div>
-                                    <div class="option-description">Receive alerts for account activity</div>
-                                </div>
-                                <label class="toggle-switch">
-                                    <input type="checkbox" checked>
-                                    <span class="toggle-slider"></span>
-                                </label>
-                            </div>
-                            <div class="security-option">
-                                <div>
-                                    <div class="option-label">Biometric Login</div>
-                                    <div class="option-description">Use fingerprint or face ID to access your account</div>
-                                </div>
-                                <label class="toggle-switch">
-                                    <input type="checkbox">
-                                    <span class="toggle-slider"></span>
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="profile-section">
-                        <h2><i class="fas fa-chart-line"></i> Account Summary</h2>
-                        <div class="user-stats">
-                            <div class="stat-item">
-                                <div class="stat-value">24</div>
-                                <div class="stat-label">Transactions</div>
-                            </div>
-                            <div class="stat-item">
-                                <div class="stat-value">5</div>
-                                <div class="stat-label">Active Budgets</div>
-                            </div>
-                            <div class="stat-item">
-                                <div class="stat-value">3</div>
-                                <div class="stat-label">Goals</div>
-                            </div>
-                        </div>
-                        
-                        <h2 style="margin-top: 30px;"><i class="fas fa-university"></i> Connected Accounts</h2>
-                        <div class="connected-accounts">
-                            <div class="account-item">
-                                <div class="account-icon">
-                                    <i class="fas fa-university"></i>
-                                </div>
-                                <div class="account-details">
-                                    <h4>Bank of America</h4>
-                                    <p>Checking ****1234</p>
-                                </div>
-                                <button class="btn-disconnect">Disconnect</button>
-                            </div>
-                            <div class="account-item">
-                                <div class="account-icon">
-                                    <i class="fas fa-credit-card"></i>
-                                </div>
-                                <div class="account-details">
-                                    <h4>Chase Credit Card</h4>
-                                    <p>Visa ****5678</p>
-                                </div>
-                                <button class="btn-disconnect">Disconnect</button>
-                            </div>
-                            <div class="account-item">
-                                <div class="account-icon">
-                                    <i class="fas fa-plus"></i>
-                                </div>
-                                <div class="account-details">
-                                    <h4>Connect New Account</h4>
-                                    <p>Link your bank or credit cards</p>
-                                </div>
-                                <button style="color: var(--primary-color);">Connect</button>
-                            </div>
-                        </div>
+                        </form>
                     </div>
                 </div>
             </div>
         </main>
     </div>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Update profile avatar
-            const avatarElements = document.querySelectorAll('#profile-avatar, #large-avatar');
-            const profileName = document.getElementById('profile-name');
-            const profileFullName = document.getElementById('profile-full-name');
-            const profileEmail = document.getElementById('profile-email');
-            
-            // Get user data from local storage or session
-            function getUser() {
-                const userString = localStorage.getItem('user');
-                if (userString) {
-                    try {
-                        return JSON.parse(userString);
-                    } catch (e) {
-                        console.error('Error parsing user data:', e);
-                    }
-                }
-                
-                // Default user data if none is found
-                return {
-                    firstName: 'Testing',
-                    lastName: 'User',
-                    email: 'testing@example.com',
-                    initial: 'T'
-                };
-            }
-            
-            const user = getUser();
-            
-            // Update elements with user data
-            if (profileName) profileName.textContent = user.firstName;
-            if (profileFullName) profileFullName.textContent = `${user.firstName} ${user.lastName}`;
-            if (profileEmail) profileEmail.textContent = user.email;
-            
-            // Update avatar with user initial
-            avatarElements.forEach(el => {
-                if (el) el.textContent = user.firstName.charAt(0).toUpperCase();
-            });
-            
-            // Form handling
-            const profileForm = document.getElementById('profile-form');
-            if (profileForm) {
-                profileForm.addEventListener('submit', function(e) {
-                    e.preventDefault();
-                    
-                    // Get form data
-                    const firstName = document.getElementById('firstName').value;
-                    const lastName = document.getElementById('lastName').value;
-                    const email = document.getElementById('email').value;
-                    const phone = document.getElementById('phone').value;
-                    
-                    // Update user object
-                    user.firstName = firstName;
-                    user.lastName = lastName;
-                    user.email = email;
-                    user.phone = phone;
-                    
-                    // Save to local storage
-                    localStorage.setItem('user', JSON.stringify(user));
-                    
-                    // Update displayed information
-                    if (profileName) profileName.textContent = firstName;
-                    if (profileFullName) profileFullName.textContent = `${firstName} ${lastName}`;
-                    if (profileEmail) profileEmail.textContent = email;
-                    
-                    // Update avatar with new initial
-                    avatarElements.forEach(el => {
-                        if (el) el.textContent = firstName.charAt(0).toUpperCase();
-                    });
-                    
-                    // Show confirmation message
-                    alert('Profile updated successfully!');
-                });
-            }
-            
-            // Logout button
-            const logoutBtn = document.getElementById('logout-btn');
-            if (logoutBtn) {
-                logoutBtn.addEventListener('click', function() {
-                    // No need for custom logic here as we're using the onclick attribute
-                    // The onclick="auth.logout()" will handle everything
-                });
-            }
-            
-            // Cancel buttons
-            const cancelButtons = document.querySelectorAll('.btn-cancel');
-            cancelButtons.forEach(button => {
-                button.addEventListener('click', function() {
-                    // Reset form fields to original values
-                    if (this.closest('form') === profileForm) {
-                        document.getElementById('firstName').value = user.firstName;
-                        document.getElementById('lastName').value = user.lastName;
-                        document.getElementById('email').value = user.email;
-                        document.getElementById('phone').value = user.phone || '';
-                    } else {
-                        // For password form, just clear the fields
-                        const passwordFields = this.closest('.profile-section').querySelectorAll('input[type="password"]');
-                        passwordFields.forEach(field => field.value = '');
-                    }
-                });
-            });
-            
-            // Avatar upload
-            const avatarUpload = document.querySelector('.avatar-upload');
-            if (avatarUpload) {
-                avatarUpload.addEventListener('click', function() {
-                    alert('Profile picture upload feature will be available soon!');
-                });
-            }
-            
-            // Toggle switches
-            const toggleSwitches = document.querySelectorAll('.toggle-switch input');
-            toggleSwitches.forEach(toggle => {
-                toggle.addEventListener('change', function() {
-                    const label = this.closest('.security-option').querySelector('.option-label').textContent;
-                    alert(`${label} has been ${this.checked ? 'enabled' : 'disabled'}.`);
-                });
-            });
-            
-            // Connect account button
-            const connectButton = document.querySelector('.connected-accounts button[style="color: var(--primary-color);"]');
-            if (connectButton) {
-                connectButton.addEventListener('click', function() {
-                    alert('Account connection feature will be available soon!');
-                });
-            }
-            
-            // Disconnect account buttons
-            const disconnectButtons = document.querySelectorAll('.btn-disconnect');
-            disconnectButtons.forEach(button => {
-                button.addEventListener('click', function() {
-                    const accountName = this.closest('.account-item').querySelector('h4').textContent;
-                    if (confirm(`Are you sure you want to disconnect ${accountName}?`)) {
-                        alert(`${accountName} has been disconnected.`);
-                        this.closest('.account-item').remove();
-                    }
-                });
-            });
-        });
-    </script>
 </body>
 </html> 

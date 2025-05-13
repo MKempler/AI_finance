@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auth Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        button {
+            padding: 10px;
+            margin: 10px 0;
+            cursor: pointer;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 10px;
+            overflow: auto;
+            max-height: 300px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Authentication Test</h1>
+    
+    <div>
+        <h2>Step 1: Login</h2>
+        <input type="email" id="email" placeholder="Email" value="testing@example.com">
+        <input type="password" id="password" placeholder="Password" value="password123">
+        <button id="login-btn">Login</button>
+        <pre id="login-result"></pre>
+    </div>
+
+    <div>
+        <h2>Step 2: Create a Goal</h2>
+        <button id="create-goal-btn" disabled>Create Test Goal</button>
+        <pre id="goal-result"></pre>
+    </div>
+
+    <div>
+        <h2>Server Status</h2>
+        <button id="check-status">Check Server Status</button>
+        <pre id="status-result"></pre>
+    </div>
+
+    <script>
+        let token = '';
+        
+        // Display current token on page load 
+        document.addEventListener('DOMContentLoaded', () => {
+            const currentToken = localStorage.getItem('token');
+            if (currentToken) {
+                document.getElementById('login-result').textContent = `Current token: ${currentToken.substring(0, 20)}...`;
+                token = currentToken;
+                document.getElementById('create-goal-btn').disabled = false;
+            }
+        });
+        
+        document.getElementById('login-btn').addEventListener('click', async () => {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const resultEl = document.getElementById('login-result');
+            
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                resultEl.textContent = JSON.stringify(data, null, 2);
+                
+                if (data.token) {
+                    token = data.token;
+                    document.getElementById('create-goal-btn').disabled = false;
+                }
+            } catch (error) {
+                resultEl.textContent = 'Error: ' + error.message;
+            }
+        });
+        
+        document.getElementById('create-goal-btn').addEventListener('click', async () => {
+            const resultEl = document.getElementById('goal-result');
+            
+            if (!token) {
+                resultEl.textContent = 'Please login first';
+                return;
+            }
+            
+            const goal = {
+                name: "Test Goal",
+                type: "savings",
+                target_amount: 5000,
+                current_amount: 1000,
+                deadline: "2024-12-31",
+                description: "Test goal to verify API"
+            };
+            
+            try {
+                const response = await fetch('/api/goals', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(goal)
+                });
+                
+                const data = await response.json();
+                resultEl.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                resultEl.textContent = 'Error: ' + error.message;
+            }
+        });
+        
+        document.getElementById('check-status').addEventListener('click', async () => {
+            const resultEl = document.getElementById('status-result');
+            
+            try {
+                const response = await fetch('/api/auth/me', {
+                    headers: {
+                        'Authorization': token ? `Bearer ${token}` : ''
+                    }
+                });
+                
+                const data = await response.json();
+                resultEl.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                resultEl.textContent = 'Error: ' + error.message;
+            }
+        });
+    </script>
+</body>
+</html> 

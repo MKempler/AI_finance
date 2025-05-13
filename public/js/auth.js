@@ -4,6 +4,7 @@ const auth = {
     setToken(token) {
         if (token) {
             localStorage.setItem('token', token);
+            console.log('Token set:', token.substring(0, 15) + '...');
         }
     },
 
@@ -11,8 +12,10 @@ const auth = {
     getToken() {
         const token = localStorage.getItem('token');
         if (!token || token === 'null' || token === 'undefined') {
+            console.log('No valid token found');
             return null;
         }
+        console.log('Token retrieved:', token.substring(0, 15) + '...');
         return token;
     },
 

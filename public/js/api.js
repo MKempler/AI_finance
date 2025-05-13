@@ -11,22 +11,39 @@ const api = {
 
     // Helper method to handle API responses
     async handleResponse(response) {
+        console.log('API Response:', response.status, response.url);
+        
+        try {
         const data = await response.json();
+            console.log('API Response data:', data);
         
         if (!response.ok) {
             // Handle authentication errors
             if (response.status === 401) {
+                    console.log('Authentication error detected');
                 // If token is invalid or expired, redirect to login
                 if (location.pathname !== '/login.html') {
+                        console.log('Redirecting to login due to auth error');
                     auth.removeToken();
                     location.href = '/login.html';
                 }
             }
             
-            throw new Error(data.message || 'API request failed');
+                // Extract the most specific error message
+                const errorMessage = data.message || 
+                                    (data.status === 'error' && data.message) || 
+                                    'API request failed';
+                const error = new Error(errorMessage);
+                error.status = response.status;
+                error.data = data;
+                throw error;
         }
         
         return data;
+        } catch (error) {
+            console.error('Error handling API response:', error);
+            throw error;
+        }
     },
 
     // Dashboard
@@ -133,12 +150,12 @@ const api = {
         }
     },
 
-    async createBudget(budget) {
+    async createBudget(budgetData) {
         try {
             const response = await fetch('/api/budgets', {
                 method: 'POST',
                 headers: this.getHeaders(),
-                body: JSON.stringify(budget)
+                body: JSON.stringify(budgetData)
             });
             return this.handleResponse(response);
         } catch (error) {
@@ -147,12 +164,12 @@ const api = {
         }
     },
 
-    async updateBudget(id, budget) {
+    async updateBudget(budgetId, budgetData) {
         try {
-            const response = await fetch(`/api/budgets/${id}`, {
+            const response = await fetch(`/api/budgets/${budgetId}`, {
                 method: 'PUT',
                 headers: this.getHeaders(),
-                body: JSON.stringify(budget)
+                body: JSON.stringify(budgetData)
             });
             return this.handleResponse(response);
         } catch (error) {
@@ -161,9 +178,9 @@ const api = {
         }
     },
 
-    async deleteBudget(id) {
+    async deleteBudget(budgetId) {
         try {
-            const response = await fetch(`/api/budgets/${id}`, {
+            const response = await fetch(`/api/budgets/${budgetId}`, {
                 method: 'DELETE',
                 headers: this.getHeaders()
             });
@@ -183,6 +200,18 @@ const api = {
             return this.handleResponse(response);
         } catch (error) {
             console.error('Error fetching goals:', error);
+            throw error;
+        }
+    },
+
+    async getGoal(id) {
+        try {
+            const response = await fetch(`/api/goals/${id}`, {
+                headers: this.getHeaders()
+            });
+            return this.handleResponse(response);
+        } catch (error) {
+            console.error('Error fetching goal:', error);
             throw error;
         }
     },
@@ -278,6 +307,47 @@ const api = {
             return this.handleResponse(response);
         } catch (error) {
             console.error('Error syncing transactions:', error);
+            throw error;
+        }
+    },
+
+    // User Profile
+    async getUserProfile() {
+        try {
+            const response = await fetch('/api/auth/me', {
+                headers: this.getHeaders()
+            });
+            return this.handleResponse(response);
+        } catch (error) {
+            console.error('Error fetching user profile:', error);
+            throw error;
+        }
+    },
+
+    async updateUserProfile(userData) {
+        try {
+            const response = await fetch('/api/auth/update-profile', {
+                method: 'PUT',
+                headers: this.getHeaders(),
+                body: JSON.stringify(userData)
+            });
+            return this.handleResponse(response);
+        } catch (error) {
+            console.error('Error updating user profile:', error);
+            throw error;
+        }
+    },
+
+    async updatePassword(passwordData) {
+        try {
+            const response = await fetch('/api/auth/update-password', {
+                method: 'PUT',
+                headers: this.getHeaders(),
+                body: JSON.stringify(passwordData)
+            });
+            return this.handleResponse(response);
+        } catch (error) {
+            console.error('Error updating password:', error);
             throw error;
         }
     }

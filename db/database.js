@@ -89,13 +89,60 @@ function initializeDatabase() {
                         }
                         console.log('Update timestamp trigger created/verified');
                         
-                        // Check the final schema after initialization
+                        // Create transactions table
+                        db.run(`
+                            CREATE TABLE IF NOT EXISTS transactions (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                user_id INTEGER NOT NULL,
+                                date TEXT NOT NULL,
+                                description TEXT NOT NULL,
+                                amount REAL NOT NULL,
+                                type TEXT NOT NULL,
+                                category TEXT NOT NULL,
+                                memo TEXT,
+                                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                            )
+                        `, (err) => {
+                            if (err) {
+                                console.error('Error creating transactions table:', err);
+                                reject(err);
+                                return;
+                            }
+                            console.log('Transactions table created/verified');
+                        });
+
+                        // Create budgets table
+                        db.run(`
+                            CREATE TABLE IF NOT EXISTS budgets (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                user_id INTEGER NOT NULL,
+                                category TEXT NOT NULL,
+                                amount REAL NOT NULL,
+                                period TEXT NOT NULL DEFAULT 'monthly',
+                                start_date TEXT NOT NULL,
+                                notes TEXT,
+                                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                            )
+                        `, (err) => {
+                            if (err) {
+                                console.error('Error creating budgets table:', err);
+                                reject(err);
+                                return;
+                            }
+                            console.log('Budgets table created/verified');
+                            
+                            // Now resolve after all tables are potentially created
                         checkDatabaseSchema()
                             .then(() => {
                                 console.log('Database tables initialized successfully');
                                 resolve();
                             })
                             .catch(reject);
+                        });
                     });
                 });
             })

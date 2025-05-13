@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { body, validationResult } = require('express-validator');
-const db = require('../config/database');
-const aiService = require('../services/aiService');
+const { db } = require('../db/database');
+const aiService = require('../server/services/aiService');
 
 // Validation middleware
 const validateGoal = [
