@@ -745,45 +745,34 @@ function saveGoal() {
 // Save goal contribution
 function saveContribution() {
     const form = document.getElementById('contribution-form');
+    if (!form) return;
     
-    if (form.checkValidity()) {
-        const goalId = document.getElementById('contribution-goal-id').value;
-        const amount = document.getElementById('contribution-amount').value;
-        const date = document.getElementById('contribution-date').value;
-        const notes = document.getElementById('contribution-notes').value;
-        
-        const contribution = {
-            amount: parseFloat(amount),
-            date,
-            notes
-        };
-        
-        // Show loading notification
-        showNotification('Saving contribution...', 'info');
-        
-        // Send data to API
-        api.addGoalContribution(goalId, contribution)
-            .then(response => {
-                if (response.status === 'success') {
-                    closeContributionModal();
-                    
-                    // Show success message
-                    showNotification('Contribution added successfully', 'success');
-                    
-                    // Refresh goals
-                    loadGoals();
-                } else {
-                    showNotification(response.message || 'Failed to save contribution', 'error');
-                }
-            })
-            .catch(error => {
-                console.error('Error saving contribution:', error);
-                showNotification('Error saving contribution: ' + (error.message || 'Unknown error'), 'error');
-            });
-    } else {
-        // Trigger form validation
-        form.reportValidity();
+    const goalId = form.getAttribute('data-goal-id');
+    const contribution = {
+        amount: parseFloat(form.amount.value),
+        date: form.date.value,
+        notes: form.notes.value || ''
+    };
+    
+    // Validate form
+    if (!contribution.amount || !contribution.date) {
+        showNotification('Please fill in all required fields', 'error');
+        return;
     }
+    
+    // Save contribution
+    api.addGoalContribution(goalId, contribution)
+        .then(response => {
+            if (response.status === 'success') {
+                closeContributionModal();
+                showNotification('Contribution added successfully', 'success');
+                loadGoals(); // Refresh goals
+            }
+        })
+        .catch(error => {
+            console.error('Error saving contribution:', error);
+            showNotification('Failed to save contribution', 'error');
+        });
 }
 
 // Initialize insights
@@ -1588,7 +1577,7 @@ function bindGoalEvents() {
             showGoalModal();
         });
     }
-
+    
     // Goal filtering
     const filterButtons = document.querySelectorAll('.goal-filter-btn');
     filterButtons.forEach(button => {
@@ -1601,72 +1590,60 @@ function bindGoalEvents() {
             this.classList.add('active');
         });
     });
-
-    // Event delegation for dynamically created elements within goals list
-    const goalsListContainer = document.querySelector('.goals-list'); 
-    if (goalsListContainer) {
-        goalsListContainer.addEventListener('click', function(event) {
-            const target = event.target;
-
-            // Dropdown toggle
-            if (target.closest('.dropdown-toggle')) {
-                event.stopPropagation();
-                const dropdownToggle = target.closest('.dropdown-toggle');
-                const dropdownMenu = dropdownToggle.nextElementSibling;
-                // Close other open dropdowns first
-                document.querySelectorAll('.dropdown-menu.show').forEach(menu => {
-                    if (menu !== dropdownMenu) {
-                        menu.classList.remove('show');
-                    }
-                });
-                dropdownMenu.classList.toggle('show');
-                return; // Prevent document click listener from firing immediately
-            }
-
-            // Edit goal
-            if (target.closest('.edit-goal')) {
-                const goalId = target.closest('.edit-goal').getAttribute('data-id');
-                editGoal(goalId);
-                return;
-            }
-
-            // Delete goal
-            if (target.closest('.delete-goal')) {
-                const goalId = target.closest('.delete-goal').getAttribute('data-id');
-                deleteGoal(goalId);
-                return;
-            }
-
-            // Contribute button
-            if (target.closest('.contribute-btn')) {
-                const goalId = target.closest('.contribute-btn').getAttribute('data-id');
-                showContributionModal(goalId);
-                return;
-            }
-
-            // View history button
-            if (target.closest('.view-history-btn')) {
-                const goalId = target.closest('.view-history-btn').getAttribute('data-id');
-                showGoalHistory(goalId);
-                return;
-            }
+    
+    // Edit goal buttons
+    const editButtons = document.querySelectorAll('.edit-goal');
+    editButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const goalId = this.getAttribute('data-id');
+            editGoal(goalId);
         });
-    }
-
-    // Close dropdowns when clicking outside
-    document.addEventListener('click', function(event) {
-        // Check if the click is outside of any dropdown menu or toggle
-        if (!event.target.closest('.goal-actions-dropdown')) {
-            document.querySelectorAll('.dropdown-menu.show').forEach(dropdown => {
-                dropdown.style.display = 'none'; // Hide using style.display for consistency if that was used before
-                                             // Or better, use classList.remove if 'show' controls display via CSS
-                dropdown.classList.remove('show'); 
-            });
-        }
     });
-
-    // REMOVE event listeners for edit, delete, contribute, view history that were previously set with querySelectorAll
-    // as they are now handled by delegation.
+    
+    // Delete goal buttons
+    const deleteButtons = document.querySelectorAll('.delete-goal');
+    deleteButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const goalId = this.getAttribute('data-id');
+            deleteGoal(goalId);
+        });
+    });
+    
+    // Contribute buttons
+    const contributeButtons = document.querySelectorAll('.contribute-btn');
+    contributeButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const goalId = this.getAttribute('data-id');
+            showContributionModal(goalId);
+        });
+    });
+    
+    // View history buttons
+    const historyButtons = document.querySelectorAll('.view-history-btn');
+    historyButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const goalId = this.getAttribute('data-id');
+            showGoalHistory(goalId);
+        });
+    });
+    
+    // Dropdown toggle
+    const dropdownToggles = document.querySelectorAll('.dropdown-toggle');
+    dropdownToggles.forEach(toggle => {
+        toggle.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const dropdown = this.nextElementSibling;
+            dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+        });
+    });
+    
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', function() {
+        const dropdowns = document.querySelectorAll('.dropdown-menu');
+        dropdowns.forEach(dropdown => {
+            dropdown.style.display = 'none';
+        });
+    });
 }
 
 // Create goal modal HTML
@@ -1889,12 +1866,67 @@ function filterGoals(filter) {
 }
 
 // Create the contribution modal HTML
-async function createContributionModal(goalId) {
+function createContributionModal(goalId) {
     const modal = document.createElement('div');
     modal.className = 'modal contribution-modal';
     modal.id = 'contribution-modal';
     
-    // Show loading message
+    // Get goal data (in a real app, you would fetch this from your API)
+    const mockGoals = {
+        "1": {
+            id: "1",
+            title: "Emergency Fund",
+            category: "savings",
+            targetAmount: "10000",
+            currentAmount: "6500",
+            targetDate: "2025-12-31",
+            description: "Build an emergency fund to cover 6 months of expenses."
+        },
+        "2": {
+            id: "2",
+            title: "New Car",
+            category: "automobile",
+            targetAmount: "25000",
+            currentAmount: "8200",
+            targetDate: "2026-06-30",
+            description: "Save for down payment on a new electric vehicle."
+        },
+        "3": {
+            id: "3",
+            title: "Vacation Fund",
+            category: "travel",
+            targetAmount: "3500",
+            currentAmount: "3500",
+            targetDate: "2025-05-15",
+            description: "Fund for summer vacation to Europe."
+        },
+        "4": {
+            id: "4",
+            title: "Home Down Payment",
+            category: "housing",
+            targetAmount: "80000",
+            currentAmount: "35000",
+            targetDate: "2028-07-31",
+            description: "Save for 20% down payment on first home."
+        },
+        "5": {
+            id: "5",
+            title: "Education Fund",
+            category: "education",
+            targetAmount: "15000",
+            currentAmount: "4200",
+            targetDate: "2026-12-31",
+            description: "Fund for professional certificate program."
+        }
+    };
+    
+    const goal = mockGoals[goalId];
+    
+    if (!goal) {
+        showNotification('Goal not found', 'error');
+        return null;
+    }
+    
     modal.innerHTML = `
         <div class="modal-content">
             <div class="modal-header">
@@ -1902,89 +1934,60 @@ async function createContributionModal(goalId) {
                 <button class="close-modal">&times;</button>
             </div>
             <div class="modal-body">
-                <div class="loading-spinner">
-                    <i class="fas fa-spinner fa-spin"></i>
-                    <span>Loading goal details...</span>
+                <div class="contribution-details">
+                    <span><strong>Goal:</strong> ${goal.title}</span>
+                    <span><strong>Current:</strong> $${parseFloat(goal.currentAmount).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                    <span><strong>Target:</strong> $${parseFloat(goal.targetAmount).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                    <span><strong>Remaining:</strong> $${(parseFloat(goal.targetAmount) - parseFloat(goal.currentAmount)).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                 </div>
+                <form id="contribution-form">
+                    <input type="hidden" id="contribution-goal-id" value="${goalId}">
+                    <div class="form-group">
+                        <label for="contribution-amount">Contribution Amount</label>
+                        <input type="number" id="contribution-amount" step="0.01" min="0.01" placeholder="0.00" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="contribution-date">Date</label>
+                        <input type="date" id="contribution-date" value="${formatDate(new Date())}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="contribution-notes">Notes (Optional)</label>
+                        <textarea id="contribution-notes" placeholder="Add notes about this contribution"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="cancel-contribution">Cancel</button>
+                <button class="btn-primary" id="save-contribution">Add Contribution</button>
             </div>
         </div>
     `;
     
-    document.body.appendChild(modal);
-    modal.style.display = 'flex';
-    
-    try {
-        // Fetch goal data from API
-        const response = await api.getGoal(goalId);
-        
-        if (!response.data || response.status !== 'success') {
-            throw new Error(response.message || 'Failed to load goal');
-        }
-        
-        const goal = response.data;
-        
-        // Update modal with goal data
-        modal.innerHTML = `
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3>Add Contribution</h3>
-                    <button class="close-modal">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <div class="contribution-details">
-                        <span><strong>Goal:</strong> ${goal.name}</span>
-                        <span><strong>Current:</strong> $${parseFloat(goal.current_amount).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                        <span><strong>Target:</strong> $${parseFloat(goal.target_amount).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                        <span><strong>Remaining:</strong> $${(parseFloat(goal.target_amount) - parseFloat(goal.current_amount)).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                    </div>
-                    <form id="contribution-form">
-                        <input type="hidden" id="contribution-goal-id" value="${goalId}">
-                        <div class="form-group">
-                            <label for="contribution-amount">Contribution Amount</label>
-                            <input type="number" id="contribution-amount" step="0.01" min="0.01" placeholder="0.00" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="contribution-date">Date</label>
-                            <input type="date" id="contribution-date" value="${formatDate(new Date())}" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="contribution-notes">Notes (Optional)</label>
-                            <textarea id="contribution-notes" placeholder="Add notes about this contribution"></textarea>
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn-secondary" id="cancel-contribution">Cancel</button>
-                    <button class="btn-primary" id="save-contribution">Add Contribution</button>
-                </div>
-            </div>
-        `;
-        
-        // Re-attach event listeners
-        const closeBtn = modal.querySelector('.close-modal');
-        const cancelBtn = modal.querySelector('#cancel-contribution');
-        const saveBtn = modal.querySelector('#save-contribution');
-        
-        closeBtn.addEventListener('click', closeContributionModal);
-        cancelBtn.addEventListener('click', closeContributionModal);
-        
-        saveBtn.addEventListener('click', function() {
-            saveContribution();
-        });
-        
-        return modal;
-    } catch (error) {
-        console.error('Error fetching goal details:', error);
-        showNotification('Error loading goal details: ' + (error.message || 'Unknown error'), 'error');
-        closeContributionModal();
-        return null;
-    }
+    return modal;
 }
 
 // Show contribution modal
-async function showContributionModal(goalId) {
-    // Create and show modal with loading state
-    await createContributionModal(goalId);
+function showContributionModal(goalId) {
+    // Create modal
+    const modal = createContributionModal(goalId);
+    if (!modal) return;
+    
+    document.body.appendChild(modal);
+    
+    // Add event listeners
+    const closeBtn = modal.querySelector('.close-modal');
+    const cancelBtn = modal.querySelector('#cancel-contribution');
+    const saveBtn = modal.querySelector('#save-contribution');
+    
+    closeBtn.addEventListener('click', closeContributionModal);
+    cancelBtn.addEventListener('click', closeContributionModal);
+    
+    saveBtn.addEventListener('click', function() {
+        saveContribution();
+    });
+    
+    // Show the modal
+    modal.style.display = 'flex';
 }
 
 // Close contribution modal
@@ -1995,14 +1998,75 @@ function closeContributionModal() {
     }
 }
 
-// Show goal history
-async function showGoalHistory(goalId) { // Make it async
-    console.log('Show history for goal:', goalId);
+// Save contribution
+function saveContribution() {
+    const form = document.getElementById('contribution-form');
+    
+    if (form.checkValidity()) {
+        const goalId = document.getElementById('contribution-goal-id').value;
+        const amount = document.getElementById('contribution-amount').value;
+        const date = document.getElementById('contribution-date').value;
+        const notes = document.getElementById('contribution-notes').value;
+        
+        const contributionData = {
+            id: Date.now().toString(),
+            goalId,
+            amount,
+            date,
+            notes
+        };
+        
+        // Here you would send the data to your API
+        console.log('Saving contribution:', contributionData);
+        
+        // For demo purposes, let's simulate a successful save
+        closeContributionModal();
+        
+        // Show success message
+        showNotification('Contribution added successfully', 'success');
+        
+        // Refresh goals (in a real app, this would fetch from API)
+        // For now, just reload the page after a short delay
+        setTimeout(() => {
+            switchTab('goals');
+        }, 1000);
+    } else {
+        // Trigger form validation
+        form.reportValidity();
+    }
+}
 
-    // Create and show a modal with a loading state first
+// Show goal history
+function showGoalHistory(goalId) {
+    console.log('Show history for goal:', goalId);
+    
+    // In a real app, you would fetch the goal history from your API
+    // For demo purposes, let's use mock data
+    const mockHistory = [
+        { date: '2025-01-15', amount: 1000, notes: 'Initial deposit' },
+        { date: '2025-02-10', amount: 500, notes: 'Monthly contribution' },
+        { date: '2025-03-12', amount: 500, notes: 'Monthly contribution' },
+        { date: '2025-04-09', amount: 750, notes: 'Bonus contribution' },
+        { date: '2025-05-11', amount: 750, notes: 'Final contribution' }
+    ];
+    
+    // Create and show a modal with the history
     const modal = document.createElement('div');
     modal.className = 'modal';
     modal.id = 'history-modal';
+    
+    let historyHTML = '';
+    mockHistory.forEach(item => {
+        const date = new Date(item.date);
+        historyHTML += `
+            <tr>
+                <td>${date.toLocaleDateString()}</td>
+                <td>$${parseFloat(item.amount).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td>${item.notes}</td>
+            </tr>
+        `;
+    });
+    
     modal.innerHTML = `
         <div class="modal-content">
             <div class="modal-header">
@@ -2010,11 +2074,7 @@ async function showGoalHistory(goalId) { // Make it async
                 <button class="close-modal">&times;</button>
             </div>
             <div class="modal-body">
-                <div class="loading-spinner" style="display: flex; justify-content: center; align-items: center; min-height: 100px;">
-                    <i class="fas fa-spinner fa-spin fa-2x"></i>
-                    <span style="margin-left: 10px;">Loading history...</span>
-                </div>
-                <table class="history-table" style="display: none;">
+                <table class="history-table">
                     <thead>
                         <tr>
                             <th>Date</th>
@@ -2023,78 +2083,39 @@ async function showGoalHistory(goalId) { // Make it async
                         </tr>
                     </thead>
                     <tbody>
-                        <!-- History will be populated here -->
+                        ${historyHTML}
                     </tbody>
                     <tfoot>
                         <tr>
-                            <td><strong>Total Contributions</strong></td>
-                            <td id="history-total-amount"><strong></strong></td>
+                            <td><strong>Total</strong></td>
+                            <td><strong>$${mockHistory.reduce((sum, item) => sum + parseFloat(item.amount), 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
                             <td></td>
                         </tr>
                     </tfoot>
                 </table>
-                <div class="no-history-message" style="display: none; text-align: center; padding: 20px;">No contributions found for this goal.</div>
             </div>
             <div class="modal-footer">
                 <button class="btn-primary" id="close-history">Close</button>
             </div>
         </div>
     `;
-
+    
     document.body.appendChild(modal);
-    modal.style.display = 'flex';
-
+    
+    // Add event listeners
     const closeBtn = modal.querySelector('.close-modal');
     const closeHistoryBtn = modal.querySelector('#close-history');
-    const tableBody = modal.querySelector('.history-table tbody');
-    const totalAmountEl = modal.querySelector('#history-total-amount strong');
-    const historyTable = modal.querySelector('.history-table');
-    const loadingSpinner = modal.querySelector('.loading-spinner');
-    const noHistoryMessage = modal.querySelector('.no-history-message');
-
-    closeBtn.addEventListener('click', () => modal.remove());
-    closeHistoryBtn.addEventListener('click', () => modal.remove());
-
-    try {
-        const response = await api.getGoalContributions(goalId);
-        loadingSpinner.style.display = 'none'; // Hide spinner
-
-        if (response.status === 'success' && response.data && response.data.length > 0) {
-            const contributions = response.data;
-            let historyHTML = '';
-            let totalContributed = 0;
-
-            contributions.forEach(item => {
-                const date = new Date(item.date);
-                // Ensure date is correctly parsed. If item.date is already YYYY-MM-DD, new Date() might misinterpret it depending on timezone.
-                // It's safer to split and construct if the format is fixed, or rely on toLocaleDateString if the date object is valid.
-                const displayDate = date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-                historyHTML += `
-                    <tr>
-                        <td>${displayDate}</td>
-                        <td>${formatCurrency(item.amount)}</td>
-                        <td>${item.notes || '-'}</td>
-                    </tr>
-                `;
-                totalContributed += parseFloat(item.amount);
-            });
-
-            tableBody.innerHTML = historyHTML;
-            totalAmountEl.textContent = formatCurrency(totalContributed);
-            historyTable.style.display = 'table'; // Show table
-        } else {
-            // No contributions or error in fetching data (though api.js should throw for actual errors)
-            noHistoryMessage.style.display = 'block'; // Show no history message
-            totalAmountEl.textContent = formatCurrency(0);
-        }
-    } catch (error) {
-        console.error('Error fetching goal history:', error);
-        loadingSpinner.style.display = 'none';
-        noHistoryMessage.textContent = 'Error loading contribution history.';
-        noHistoryMessage.style.display = 'block';
-        showNotification('Failed to load contribution history', 'error');
-        totalAmountEl.textContent = formatCurrency(0);
-    }
+    
+    closeBtn.addEventListener('click', function() {
+        modal.remove();
+    });
+    
+    closeHistoryBtn.addEventListener('click', function() {
+        modal.remove();
+    });
+    
+    // Show the modal
+    modal.style.display = 'flex';
 }
 
 // AI Insights functionality
@@ -3181,44 +3202,42 @@ function populateGoalsList(goals) {
                         </button>
                         <button class="dropdown-item delete-goal" data-id="${goalId}">
                             <i class="fas fa-trash"></i> Delete
-                        </button>
-                    </div>
+                    </button>
                 </div>
             </div>
-
+            </div>
+            
             <div class="goal-details">
                 <div class="goal-amount">
                     <span class="current">${formatCurrency(currentAmount)}</span>
                     <span class="separator">of</span>
                     <span class="target">${formatCurrency(targetAmount)}</span>
                 </div>
-                <div class="goal-progress">
-                    <div class="progress-bar">
-                        <div class="progress-fill" style="width: ${percentage}%"></div>
-                    </div>
-                    <span class="progress-text">${Math.round(percentage)}% Complete</span>
+            <div class="goal-progress">
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: ${percentage}%"></div>
                 </div>
-                <div class="goal-info">
+                    <span class="progress-text">${Math.round(percentage)}% Complete</span>
+            </div>
+            <div class="goal-info">
                     <div class="goal-date">
-                        <i class="fas fa-calendar"></i>
+                    <i class="fas fa-calendar"></i>
                         <span>${status === 'completed' ? 'Completed' : 'Target'}: ${formattedDeadline}</span>
-                    </div>
+                </div>
                     <div class="goal-category">
                         <i class="fas ${getGoalTypeIcon(goalType)}"></i>
                         <span>${goalType}</span>
-                    </div>
+                </div>
                 </div>
                 ${goal.description ? `<p class="goal-description">${goal.description}</p>` : ''}
-                <div class="goal-main-actions">
-                    ${status === 'completed' ?
-                        `<button class="btn-secondary view-history-btn" data-id="${goalId}">
-                            <i class="fas fa-history"></i> View History
-                        </button>` :
-                        `<button class="btn-primary contribute-btn" data-id="${goalId}">
-                            <i class="fas fa-plus"></i> Add Contribution
-                        </button>`
-                    }
-                </div>
+                ${status === 'completed' ? 
+                    `<button class="btn-secondary view-history-btn" data-id="${goalId}">
+                        <i class="fas fa-history"></i> View History
+                    </button>` : 
+                    `<button class="btn-primary contribute-btn" data-id="${goalId}">
+                        <i class="fas fa-plus"></i> Add Contribution
+                    </button>`
+                }
             </div>
         `;
         
@@ -3242,9 +3261,8 @@ function populateGoalsList(goals) {
     
     document.querySelectorAll('.contribute-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-            const id = btn.getAttribute('data-id'); // ID is retrieved here
-            console.log('CONTRIBUTE BTN CLICKED - Goal ID:', id); // <-- Add this line
-            showContributionModal(id); // And passed to showContributionModal
+            const id = btn.getAttribute('data-id');
+            showContributionModal(id);
         });
     });
     
@@ -3252,6 +3270,21 @@ function populateGoalsList(goals) {
         btn.addEventListener('click', () => {
             const id = btn.getAttribute('data-id');
             showGoalHistory(id);
+        });
+    });
+    
+    // Initialize dropdowns
+    document.querySelectorAll('.dropdown-toggle').forEach(toggle => {
+        toggle.addEventListener('click', function(e) {
+            e.stopPropagation();
+            this.nextElementSibling.classList.toggle('show');
+        });
+    });
+    
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', function() {
+        document.querySelectorAll('.dropdown-menu.show').forEach(menu => {
+            menu.classList.remove('show');
         });
     });
 }

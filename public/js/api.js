@@ -271,6 +271,18 @@ const api = {
         }
     },
 
+    async getGoalContributions(id) {
+        try {
+            const response = await fetch(`/api/goals/${id}/contributions`, {
+                headers: this.getHeaders()
+            });
+            return this.handleResponse(response);
+        } catch (error) {
+            console.error('Error fetching goal contributions:', error);
+            throw error;
+        }
+    },
+
     // AI Features
     async getInsights() {
         try {

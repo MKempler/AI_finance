@@ -399,6 +399,13 @@
                         <span>AI Insights</span>
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" data-target="settings">
+                        <i class="fas fa-cog"></i>
+                        <span>Settings</span>
+                    </a>
+                </li>
+            </ul>
         </nav>
 
         <!-- Main Content -->
@@ -1277,6 +1284,262 @@
             </div>
             <!-- End AI Insights Tab -->
 
+            <!-- Settings Tab -->
+            <div class="tab-content" id="settings">
+                <div class="section-header">
+                    <h2>Settings</h2>
+                    <p class="subtitle">Customize your finance dashboard experience</p>
+                </div>
+                
+                <div class="settings-container">
+                    <!-- Profile Settings -->
+                    <div class="settings-section">
+                        <div class="settings-header">
+                            <h3>Profile Settings</h3>
+                            <p>Manage your personal information</p>
+                        </div>
+                        <div class="settings-content">
+                            <form id="profile-form" class="settings-form">
+                                <div class="form-group">
+                                    <label for="settings-name">Full Name</label>
+                                    <input type="text" id="settings-name" placeholder="Enter your name" value="John Doe">
+                                </div>
+                                <div class="form-group">
+                                    <label for="settings-email">Email Address</label>
+                                    <input type="email" id="settings-email" placeholder="Enter your email" value="john@example.com" disabled>
+                                    <small class="form-note">Email cannot be changed</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="settings-phone">Phone Number</label>
+                                    <input type="tel" id="settings-phone" placeholder="Enter your phone number" value="(555) 123-4567">
+                                </div>
+                                <button type="button" id="save-profile" class="btn-primary">Save Profile</button>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <!-- Appearance Settings -->
+                    <div class="settings-section">
+                        <div class="settings-header">
+                            <h3>Appearance</h3>
+                            <p>Customize how the dashboard looks</p>
+                        </div>
+                        <div class="settings-content">
+                            <form id="appearance-form" class="settings-form">
+                                <div class="form-group">
+                                    <label>Theme</label>
+                                    <div class="theme-selector">
+                                        <div class="theme-option active" data-theme="light">
+                                            <div class="theme-preview light-theme"></div>
+                                            <span>Light</span>
+                                        </div>
+                                        <div class="theme-option" data-theme="dark">
+                                            <div class="theme-preview dark-theme"></div>
+                                            <span>Dark</span>
+                                        </div>
+                                        <div class="theme-option" data-theme="system">
+                                            <div class="theme-preview system-theme"></div>
+                                            <span>System</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="settings-currency">Currency</label>
+                                    <select id="settings-currency">
+                                        <option value="USD" selected>USD ($)</option>
+                                        <option value="EUR">EUR (€)</option>
+                                        <option value="GBP">GBP (£)</option>
+                                        <option value="CAD">CAD (C$)</option>
+                                        <option value="AUD">AUD (A$)</option>
+                                        <option value="JPY">JPY (¥)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="settings-date-format">Date Format</label>
+                                    <select id="settings-date-format">
+                                        <option value="MM/DD/YYYY" selected>MM/DD/YYYY</option>
+                                        <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+                                        <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                                    </select>
+                                </div>
+                                <button type="button" id="save-appearance" class="btn-primary">Save Appearance</button>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <!-- Notifications Settings -->
+                    <div class="settings-section">
+                        <div class="settings-header">
+                            <h3>Notifications</h3>
+                            <p>Manage your notification preferences</p>
+                        </div>
+                        <div class="settings-content">
+                            <form id="notifications-form" class="settings-form">
+                                <div class="form-group">
+                                    <label>Email Notifications</label>
+                                    <div class="toggle-options">
+                                        <div class="toggle-option">
+                                            <label class="toggle-label">Weekly Summary</label>
+                                            <label class="toggle-switch">
+                                                <input type="checkbox" checked>
+                                                <span class="toggle-slider"></span>
+                                            </label>
+                                        </div>
+                                        <div class="toggle-option">
+                                            <label class="toggle-label">Over Budget Alerts</label>
+                                            <label class="toggle-switch">
+                                                <input type="checkbox" checked>
+                                                <span class="toggle-slider"></span>
+                                            </label>
+                                        </div>
+                                        <div class="toggle-option">
+                                            <label class="toggle-label">Goal Achievement</label>
+                                            <label class="toggle-switch">
+                                                <input type="checkbox" checked>
+                                                <span class="toggle-slider"></span>
+                                            </label>
+                                        </div>
+                                        <div class="toggle-option">
+                                            <label class="toggle-label">AI Insights</label>
+                                            <label class="toggle-switch">
+                                                <input type="checkbox">
+                                                <span class="toggle-slider"></span>
+                                            </label>
+                                        </div>
+                                        <div class="toggle-option">
+                                            <label class="toggle-label">Marketing Updates</label>
+                                            <label class="toggle-switch">
+                                                <input type="checkbox">
+                                                <span class="toggle-slider"></span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="button" id="save-notifications" class="btn-primary">Save Notification Settings</button>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <!-- Security Settings -->
+                    <div class="settings-section">
+                        <div class="settings-header">
+                            <h3>Security</h3>
+                            <p>Manage your account security</p>
+                        </div>
+                        <div class="settings-content">
+                            <form id="security-form" class="settings-form">
+                                <div class="form-group">
+                                    <label for="current-password">Current Password</label>
+                                    <input type="password" id="current-password" placeholder="Enter current password">
+                                </div>
+                                <div class="form-group">
+                                    <label for="new-password">New Password</label>
+                                    <input type="password" id="new-password" placeholder="Enter new password">
+                                </div>
+                                <div class="form-group">
+                                    <label for="confirm-password">Confirm Password</label>
+                                    <input type="password" id="confirm-password" placeholder="Confirm new password">
+                                </div>
+                                <div class="password-requirements">
+                                    <p>Password must:</p>
+                                    <ul>
+                                        <li>Be at least 8 characters long</li>
+                                        <li>Include at least one uppercase letter</li>
+                                        <li>Include at least one number</li>
+                                        <li>Include at least one special character</li>
+                                    </ul>
+                                </div>
+                                <button type="button" id="change-password" class="btn-primary">Change Password</button>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <!-- Connected Accounts -->
+                    <div class="settings-section">
+                        <div class="settings-header">
+                            <h3>Connected Accounts</h3>
+                            <p>Manage your linked financial accounts</p>
+                        </div>
+                        <div class="settings-content">
+                            <div class="connected-accounts">
+                                <div class="account-item connected">
+                                    <div class="account-icon bank">
+                                        <i class="fas fa-university"></i>
+                                    </div>
+                                    <div class="account-details">
+                                        <h4>Chase Bank</h4>
+                                        <span class="account-status">Connected on Jul 15, 2025</span>
+                                    </div>
+                                    <button class="btn-secondary disconnect-btn">Disconnect</button>
+                                </div>
+                                <div class="account-item connected">
+                                    <div class="account-icon credit">
+                                        <i class="fas fa-credit-card"></i>
+                                    </div>
+                                    <div class="account-details">
+                                        <h4>American Express</h4>
+                                        <span class="account-status">Connected on Jun 22, 2025</span>
+                                    </div>
+                                    <button class="btn-secondary disconnect-btn">Disconnect</button>
+                                </div>
+                                <div class="account-item">
+                                    <div class="account-icon add">
+                                        <i class="fas fa-plus"></i>
+                                    </div>
+                                    <div class="account-details">
+                                        <h4>Connect a New Account</h4>
+                                        <span class="account-status">Add your financial institution</span>
+                                    </div>
+                                    <button class="btn-primary connect-btn">Connect</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Data Management -->
+                    <div class="settings-section">
+                        <div class="settings-header">
+                            <h3>Data Management</h3>
+                            <p>Manage your finance data</p>
+                        </div>
+                        <div class="settings-content">
+                            <div class="data-actions">
+                                <div class="data-action">
+                                    <div class="data-action-icon export">
+                                        <i class="fas fa-file-export"></i>
+                                    </div>
+                                    <div class="data-action-details">
+                                        <h4>Export Data</h4>
+                                        <p>Download all your financial data in CSV format</p>
+                                    </div>
+                                    <button class="btn-secondary export-btn">Export Data</button>
+                                </div>
+                                <div class="data-action">
+                                    <div class="data-action-icon import">
+                                        <i class="fas fa-file-import"></i>
+                                    </div>
+                                    <div class="data-action-details">
+                                        <h4>Import Data</h4>
+                                        <p>Upload financial data from another service</p>
+                                    </div>
+                                    <button class="btn-secondary import-btn">Import Data</button>
+                                </div>
+                                <div class="data-action danger">
+                                    <div class="data-action-icon delete">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </div>
+                                    <div class="data-action-details">
+                                        <h4>Delete Account</h4>
+                                        <p>Permanently delete your account and all data</p>
+                                    </div>
+                                    <button class="btn-danger delete-account-btn">Delete Account</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- End Settings Tab -->
         </main>
     </div>
     <script src="js/auth.js"></script>

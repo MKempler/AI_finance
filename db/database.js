@@ -135,13 +135,59 @@ function initializeDatabase() {
                             }
                             console.log('Budgets table created/verified');
                             
-                            // Now resolve after all tables are potentially created
-                        checkDatabaseSchema()
-                            .then(() => {
-                                console.log('Database tables initialized successfully');
-                                resolve();
-                            })
-                            .catch(reject);
+                            // Create goals table if it doesn't exist
+                            db.run(`
+                                CREATE TABLE IF NOT EXISTS goals (
+                                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                    user_id INTEGER NOT NULL,
+                                    name TEXT NOT NULL,
+                                    target_amount REAL NOT NULL,
+                                    current_amount REAL NOT NULL DEFAULT 0,
+                                    deadline TEXT NOT NULL,
+                                    type TEXT NOT NULL,
+                                    description TEXT,
+                                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                                )
+                            `, (err) => {
+                                if (err) {
+                                    console.error('Error creating goals table:', err);
+                                    reject(err);
+                                    return;
+                                }
+                                console.log('Goals table created/verified');
+                                
+                                // Create goal_contributions table
+                                db.run(`
+                                    CREATE TABLE IF NOT EXISTS goal_contributions (
+                                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                        goal_id INTEGER NOT NULL,
+                                        user_id INTEGER NOT NULL,
+                                        amount REAL NOT NULL,
+                                        date TEXT NOT NULL,
+                                        notes TEXT,
+                                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                        FOREIGN KEY (goal_id) REFERENCES goals(id) ON DELETE CASCADE,
+                                        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                                    )
+                                `, (err) => {
+                                    if (err) {
+                                        console.error('Error creating goal_contributions table:', err);
+                                        reject(err);
+                                        return;
+                                    }
+                                    console.log('Goal contributions table created/verified');
+                                    
+                                    // Now resolve after all tables are potentially created
+                                    checkDatabaseSchema()
+                                        .then(() => {
+                                            console.log('Database tables initialized successfully');
+                                            resolve();
+                                        })
+                                        .catch(reject);
+                                });
+                            });
                         });
                     });
                 });
