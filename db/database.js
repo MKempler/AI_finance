@@ -1,244 +1,217 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
+const { Pool } = require('pg');
+const dotenv = require('dotenv'); // Ensure dotenv is used if not already globally configured
+dotenv.config(); // Load .env variables
 
-// Create database connection
-const dbPath = path.join(__dirname, '../data/finance_tracker.db');
-const db = new sqlite3.Database(dbPath, (err) => {
-    if (err) {
-        console.error('Error opening database:', err);
-        process.exit(1);
+// Create a PostgreSQL connection pool
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    // ssl: { rejectUnauthorized: false } // Add this if connecting to a cloud DB that requires SSL and you encounter SSL issues
+});
+
+pool.on('connect', () => {
+    console.log('Connected to PostgreSQL database via pg Pool');
+});
+
+pool.on('error', (err) => {
+    console.error('Unexpected error on idle client in pg Pool', err);
+    process.exit(-1);
+});
+
+// Function to check database schema (PostgreSQL version)
+async function checkDatabaseSchema() {
+    console.log('Checking PostgreSQL database schema...');
+    try {
+        const res = await pool.query(`
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_schema = 'public'
+            ORDER BY table_name;
+        `);
+        const tables = res.rows.map(r => r.table_name);
+        console.log('Existing tables in public schema:', tables);
+
+        if (tables.includes('users')) {
+            const userColsRes = await pool.query(`
+                SELECT column_name, data_type 
+                FROM information_schema.columns 
+                WHERE table_schema = 'public' AND table_name = 'users'
+                ORDER BY ordinal_position;
+            `);
+            console.log('Users table columns:', userColsRes.rows.map(c => `${c.column_name} (${c.data_type})`));
+        }
+        return tables;
+    } catch (err) {
+        console.error('Error checking PostgreSQL schema:', err);
+        throw err;
     }
-    console.log('Connected to SQLite database');
-});
-
-// Function to check database schema
-function checkDatabaseSchema() {
-    return new Promise((resolve, reject) => {
-        // List all tables
-        db.all("SELECT name FROM sqlite_master WHERE type='table';", (err, tables) => {
-            if (err) {
-                console.error('Error checking tables:', err);
-                reject(err);
-                return;
-            }
-            
-            console.log('Existing tables:', tables.map(t => t.name));
-            
-            // Check users table specifically
-            if (tables.some(t => t.name === 'users')) {
-                db.all("PRAGMA table_info(users);", (err, columns) => {
-                    if (err) {
-                        console.error('Error checking users table structure:', err);
-                        reject(err);
-                        return;
-                    }
-                    
-                    console.log('Users table columns:', columns.map(c => `${c.name} (${c.type})`));
-                    resolve(tables);
-                });
-            } else {
-                console.log('Users table not found');
-                resolve(tables);
-            }
-        });
-    });
 }
 
-// Initialize database tables
-function initializeDatabase() {
-    return new Promise((resolve, reject) => {
-        // First check the current schema
-        checkDatabaseSchema()
-            .then(() => {
-                console.log('Creating/updating database tables...');
-                db.serialize(() => {
-                    // Create users table
-                    db.run(`
-                        CREATE TABLE IF NOT EXISTS users (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            name TEXT NOT NULL,
-                            email TEXT UNIQUE NOT NULL,
-                            password TEXT NOT NULL,
-                            reset_token TEXT,
-                            reset_token_expires DATETIME,
-                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                        )
-                    `, (err) => {
-                        if (err) {
-                            console.error('Error creating users table:', err);
-                            reject(err);
-                            return;
-                        }
-                        console.log('Users table created/verified');
-                    });
+// Initialize database tables (PostgreSQL version)
+async function initializeDatabase() {
+    console.log('Initializing/verifying PostgreSQL database tables...');
+    try {
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                reset_token TEXT,
+                reset_token_expires TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        console.log('Users table created/verified');
 
-                    // Create trigger to update updated_at timestamp
-                    db.run(`
-                        CREATE TRIGGER IF NOT EXISTS update_users_timestamp 
-                        AFTER UPDATE ON users
-                        BEGIN
-                            UPDATE users SET updated_at = CURRENT_TIMESTAMP
-                            WHERE id = NEW.id;
-                        END
-                    `, (err) => {
-                        if (err) {
-                            console.error('Error creating trigger:', err);
-                            reject(err);
-                            return;
-                        }
-                        console.log('Update timestamp trigger created/verified');
-                        
-                        // Create transactions table
-                        db.run(`
-                            CREATE TABLE IF NOT EXISTS transactions (
-                                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                user_id INTEGER NOT NULL,
-                                date TEXT NOT NULL,
-                                description TEXT NOT NULL,
-                                amount REAL NOT NULL,
-                                type TEXT NOT NULL,
-                                category TEXT NOT NULL,
-                                memo TEXT,
-                                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-                            )
-                        `, (err) => {
-                            if (err) {
-                                console.error('Error creating transactions table:', err);
-                                reject(err);
-                                return;
-                            }
-                            console.log('Transactions table created/verified');
-                        });
+        // TODO: PostgreSQL equivalent for SQLite trigger 'update_users_timestamp'
+        // This typically involves creating a function and then a trigger.
+        // For now, updated_at will need to be handled by application logic on updates.
+        // Example of how it might be done (requires more setup):
+        // CREATE OR REPLACE FUNCTION update_updated_at_column()
+        // RETURNS TRIGGER AS $$
+        // BEGIN
+        //    NEW.updated_at = NOW();
+        //    RETURN NEW;
+        // END;
+        // $$ language 'plpgsql';
+        // CREATE TRIGGER update_users_updated_at
+        // BEFORE UPDATE ON users
+        // FOR EACH ROW
+        // EXECUTE PROCEDURE update_updated_at_column();
 
-                        // Create budgets table
-                        db.run(`
-                            CREATE TABLE IF NOT EXISTS budgets (
-                                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                user_id INTEGER NOT NULL,
-                                category TEXT NOT NULL,
-                                amount REAL NOT NULL,
-                                period TEXT NOT NULL DEFAULT 'monthly',
-                                start_date TEXT NOT NULL,
-                                notes TEXT,
-                                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-                            )
-                        `, (err) => {
-                            if (err) {
-                                console.error('Error creating budgets table:', err);
-                                reject(err);
-                                return;
-                            }
-                            console.log('Budgets table created/verified');
-                            
-                            // Create goals table if it doesn't exist
-                            db.run(`
-                                CREATE TABLE IF NOT EXISTS goals (
-                                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                    user_id INTEGER NOT NULL,
-                                    name TEXT NOT NULL,
-                                    target_amount REAL NOT NULL,
-                                    current_amount REAL NOT NULL DEFAULT 0,
-                                    deadline TEXT NOT NULL,
-                                    type TEXT NOT NULL,
-                                    description TEXT,
-                                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-                                )
-                            `, (err) => {
-                                if (err) {
-                                    console.error('Error creating goals table:', err);
-                                    reject(err);
-                                    return;
-                                }
-                                console.log('Goals table created/verified');
-                                
-                                // Create goal_contributions table
-                                db.run(`
-                                    CREATE TABLE IF NOT EXISTS goal_contributions (
-                                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                        goal_id INTEGER NOT NULL,
-                                        user_id INTEGER NOT NULL,
-                                        amount REAL NOT NULL,
-                                        date TEXT NOT NULL,
-                                        notes TEXT,
-                                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                        FOREIGN KEY (goal_id) REFERENCES goals(id) ON DELETE CASCADE,
-                                        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-                                    )
-                                `, (err) => {
-                                    if (err) {
-                                        console.error('Error creating goal_contributions table:', err);
-                                        reject(err);
-                                        return;
-                                    }
-                                    console.log('Goal contributions table created/verified');
-                                    
-                                    // Create insights table
-                                    db.run(`
-                                        CREATE TABLE IF NOT EXISTS insights (
-                                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                            user_id INTEGER NOT NULL,
-                                            title TEXT NOT NULL,
-                                            content TEXT NOT NULL,
-                                            type TEXT NOT NULL, -- e.g., spending, saving, budget, goal, warning, tip
-                                            generated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-                                        )
-                                    `, (err) => {
-                                        if (err) {
-                                            console.error('Error creating insights table:', err);
-                                            reject(err);
-                                            return;
-                                        }
-                                        console.log('Insights table created/verified');
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS transactions (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                date DATE NOT NULL, -- Consider DATE type for dates
+                description TEXT NOT NULL,
+                amount REAL NOT NULL, -- Or DECIMAL(10, 2) for more precision with money
+                type TEXT NOT NULL,
+                category TEXT NOT NULL,
+                memo TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        console.log('Transactions table created/verified');
 
-                                        // Now resolve after all tables are potentially created
-                                        checkDatabaseSchema()
-                                            .then(() => {
-                                                console.log('Database tables initialized successfully');
-                                                resolve();
-                                            })
-                                            .catch(reject);
-                                    });
-                                });
-                            });
-                        });
-                    });
-                });
-            })
-            .catch(reject);
-    });
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS budgets (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                category TEXT NOT NULL,
+                amount REAL NOT NULL, -- Or DECIMAL(10, 2)
+                period TEXT NOT NULL DEFAULT 'monthly',
+                start_date DATE NOT NULL, -- Consider DATE type
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        console.log('Budgets table created/verified');
+
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS goals (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                name TEXT NOT NULL,
+                target_amount REAL NOT NULL, -- Or DECIMAL(10, 2)
+                current_amount REAL NOT NULL DEFAULT 0, -- Or DECIMAL(10, 2)
+                deadline DATE NOT NULL, -- Consider DATE type
+                type TEXT NOT NULL,
+                description TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        console.log('Goals table created/verified');
+
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS goal_contributions (
+                id SERIAL PRIMARY KEY,
+                goal_id INTEGER NOT NULL REFERENCES goals(id) ON DELETE CASCADE,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, -- Redundant if goal_id implies user_id, but good for direct queries
+                amount REAL NOT NULL, -- Or DECIMAL(10, 2)
+                date DATE NOT NULL, -- Consider DATE type
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        console.log('Goal contributions table created/verified');
+
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS insights (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                title TEXT NOT NULL,
+                content TEXT NOT NULL,
+                type TEXT NOT NULL,
+                generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        console.log('Insights table created/verified');
+
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS sync_queue (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                operation TEXT NOT NULL,
+                entity_type TEXT NOT NULL,
+                entity_id TEXT NOT NULL, -- If this ID refers to other tables, consider its type. TEXT is flexible.
+                data JSONB NOT NULL, -- Using JSONB for better performance and indexing capabilities with JSON
+                status TEXT NOT NULL DEFAULT 'pending', -- e.g., pending, processing, synced, failed
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        console.log('Sync queue table created/verified');
+
+        console.log('Database tables initialized successfully for PostgreSQL.');
+        await checkDatabaseSchema(); // Verify schema after creation/update
+
+    } catch (err) {
+        console.error('Error initializing PostgreSQL database tables:', err);
+        // If running locally for the first time, the database in DATABASE_URL might not exist.
+        // For cloud providers like Neon/Supabase, the database is usually pre-created.
+        // For local PostgreSQL, you might need to run `createdb your_db_name`
+        if (err.code === '3D000') { // 3D000: database "your_db_name" does not exist
+             console.error(`Database specified in DATABASE_URL does not exist. Please create it first.`)
+        }
+        throw err; // Re-throw error to be caught by server startup
+    }
 }
 
-// Export a function to run SQL queries for debugging
-function runDebugQuery(query, params = []) {
-    return new Promise((resolve, reject) => {
-        db.all(query, params, (err, rows) => {
-            if (err) {
-                console.error('Debug query error:', err);
-                reject(err);
-                return;
-            }
-            resolve(rows);
-        });
-    });
+// Export a function to run SQL queries (this will replace the direct db export)
+// All parts of your app that used `db.run`, `db.get`, `db.all` will need to be updated
+// to use this `query` function or interact with the pool directly.
+async function query(text, params) {
+    // const start = Date.now();
+    try {
+        const res = await pool.query(text, params);
+        // const duration = Date.now() - start;
+        // console.log('executed query', { text, duration, rows: res.rowCount });
+        return res;
+    } catch (err) {
+        console.error('Error executing query:', { text, params });
+        console.error(err);
+        throw err;
+    }
 }
 
-// Initialize the database
-initializeDatabase().catch(err => {
-    console.error('Failed to initialize database:', err);
-    process.exit(1);
-});
+// Initialize the database (this will be called when this module is required)
+(async () => {
+    try {
+        await initializeDatabase();
+    } catch (err) {
+        console.error('Failed to initialize database on startup:', err);
+        // process.exit(1); // Consider whether to exit or let the app try to continue/handle this
+    }
+})();
 
 module.exports = {
-    db,
-    dbPath,
-    checkDatabaseSchema,
-    runDebugQuery
+    query, // Export the query function
+    pool,  // Export the pool directly for more complex needs if necessary
+    checkDatabaseSchema, // For debugging or admin tasks
+    initializeDatabase // Could be called manually if needed
 }; 

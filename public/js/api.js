@@ -353,7 +353,7 @@ const api = {
 
     async updateUserProfile(userData) {
         try {
-            const response = await fetch('/api/auth/update-profile', {
+            const response = await fetch('/api/auth/profile', {
                 method: 'PUT',
                 headers: this.getHeaders(),
                 body: JSON.stringify(userData)
@@ -367,7 +367,7 @@ const api = {
 
     async updatePassword(passwordData) {
         try {
-            const response = await fetch('/api/auth/update-password', {
+            const response = await fetch('/api/auth/password', {
                 method: 'PUT',
                 headers: this.getHeaders(),
                 body: JSON.stringify(passwordData)
