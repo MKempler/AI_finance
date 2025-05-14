@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { OpenAI } = require('openai');
-const { db } = require('../db/database');
+const { query } = require('../db/database');
 const authenticateToken = require('../middleware/auth'); // Assuming you have auth middleware
 
 // Initialize OpenAI Client
@@ -29,26 +29,14 @@ router.post('/generate-insights', authenticateToken, async (req, res) => {
 
     try {
         // 1. Retrieve data for the user (budgets, goals, transactions) from db
-        const transactionsPromise = new Promise((resolve, reject) => {
-            db.all("SELECT * FROM transactions WHERE user_id = ? ORDER BY date DESC LIMIT 50", [userId], (err, rows) => {
-                if (err) reject(err);
-                else resolve(rows);
-            });
-        });
+        const transactionsPromise = query("SELECT * FROM transactions WHERE user_id = $1 ORDER BY date DESC LIMIT 50", [userId]).then(r => r.rows);
 
-        const budgetsPromise = new Promise((resolve, reject) => {
-            db.all("SELECT * FROM budgets WHERE user_id = ?", [userId], (err, rows) => {
-                if (err) reject(err);
-                else resolve(rows);
-            });
-        });
+        const budgetsPromise = query("SELECT * FROM budgets WHERE user_id = $1", [userId]).then(r => r.rows);
 
-        const goalsPromise = new Promise((resolve, reject) => {
-            db.all("SELECT g.*, SUM(gc.amount) as total_contributed FROM goals g LEFT JOIN goal_contributions gc ON g.id = gc.goal_id WHERE g.user_id = ? GROUP BY g.id", [userId], (err, rows) => {
-                if (err) reject(err);
-                else resolve(rows);
-            });
-        });
+        const goalsPromise = query(
+            "SELECT g.*, COALESCE(SUM(gc.amount), 0) as total_contributed FROM goals g LEFT JOIN goal_contributions gc ON g.id = gc.goal_id WHERE g.user_id = $1 GROUP BY g.id", 
+            [userId]
+        ).then(r => r.rows);
 
         const [transactions, budgets, goals] = await Promise.all([
             transactionsPromise,
@@ -134,40 +122,31 @@ router.post('/generate-insights', authenticateToken, async (req, res) => {
 
         // 5. Store insights in the database
         // Delete old insights for the user first
-        await new Promise((resolve, reject) => {
-            db.run("DELETE FROM insights WHERE user_id = ?", [userId], function(err) {
-                if (err) {
-                    console.error('Error deleting old insights:', err);
-                    reject(err); // Or handle more gracefully, maybe just log and continue
-                } else {
-                    console.log(`Deleted old insights for user ${userId}:`, this.changes);
-                    resolve();
-                }
-            });
-        });
+        const deleteResult = await query("DELETE FROM insights WHERE user_id = $1", [userId]);
+        console.log(`Deleted ${deleteResult.rowCount} old insights for user ${userId}`);
 
         // Insert new insights
-        const insertPromises = parsedInsights.map(insight => {
-            return new Promise((resolve, reject) => {
-                db.run(
-                    "INSERT INTO insights (user_id, title, content, type) VALUES (?, ?, ?, ?)", 
-                    [userId, insight.title, insight.content, insight.type],
-                    function(err) {
-                        if (err) {
-                            console.error('Error inserting insight:', err);
-                            reject(err); // Or collect errors and report
-                        } else {
-                            resolve({ id: this.lastID, ...insight });
-                        }
-                    }
+        const insertedInsights = [];
+        for (const insight of parsedInsights) {
+            try {
+                const insertResult = await query(
+                    "INSERT INTO insights (user_id, title, content, type) VALUES ($1, $2, $3, $4) RETURNING id", 
+                    [userId, insight.title, insight.content, insight.type]
                 );
-            });
-        });
-        
-        await Promise.all(insertPromises);
-        console.log(`Successfully inserted ${parsedInsights.length} new insights for user ${userId}`);
+                if (insertResult.rows.length > 0) {
+                    insertedInsights.push({ id: insertResult.rows[0].id, ...insight });
+                } else {
+                     // Should not happen with RETURNING if insert was successful without error
+                    console.warn('Insight insert did not return an ID:', insight);
+                }
+            } catch (insertErr) {
+                console.error('Error inserting insight:', insertErr, 'Insight data:', insight);
+                // Decide if you want to stop all or continue. Here, we'll log and continue.
+            }
+        }
+        console.log(`Successfully inserted ${insertedInsights.length} new insights for user ${userId}`);
 
-        res.json({ status: 'success', data: parsedInsights });
+        res.json({ status: 'success', data: insertedInsights.length > 0 ? insertedInsights : parsedInsights }); // Return inserted or originally parsed
 
     } catch (error) {
         console.error(`Error generating insights for user ${userId}:`, error);
@@ -184,13 +163,8 @@ router.post('/generate-insights', authenticateToken, async (req, res) => {
 router.get('/insights', authenticateToken, async (req, res) => {
     const userId = req.user.id;
     try {
-        db.all("SELECT title, content, type, generated_at FROM insights WHERE user_id = ? ORDER BY generated_at DESC", [userId], (err, insights) => {
-            if (err) {
-                console.error(`Error fetching stored insights for user ${userId}:`, err);
-                return res.status(500).json({ status: 'error', message: 'Database error fetching insights' });
-            }
-            res.json({ status: 'success', data: insights });
-        });
+        const result = await query("SELECT title, content, type, generated_at FROM insights WHERE user_id = $1 ORDER BY generated_at DESC", [userId]);
+        res.json({ status: 'success', data: result.rows });
     } catch (error) {
         console.error(`Error in GET /insights for user ${userId}:`, error);
         res.status(500).json({ status: 'error', message: 'Failed to fetch insights' });

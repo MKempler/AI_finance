@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { db } = require('../db/database');
+// const { db } = require('../db/database'); // Old SQLite import
+const { query } = require('../db/database'); // New PostgreSQL query function
 const { body, validationResult } = require('express-validator');
 const authenticateToken = require('../middleware/auth');
 const moment = require('moment'); // Using moment for easier date calculations
@@ -11,45 +12,35 @@ router.use(authenticateToken);
 // --- GET /api/budgets - Get all budgets for the user with spent calculation ---
 router.get('/', async (req, res) => {
     const userId = req.user.id;
-
     try {
         // 1. Get all budgets for the user
-        const budgets = await new Promise((resolve, reject) => {
-            db.all('SELECT * FROM budgets WHERE user_id = ? ORDER BY category', [userId], (err, rows) => {
-                if (err) reject(err);
-                else resolve(rows);
-            });
-        });
+        const budgetResult = await query('SELECT * FROM budgets WHERE user_id = $1 ORDER BY category', [userId]);
+        const budgets = budgetResult.rows;
 
-        // 2. For each budget, calculate the spent amount for the current period (assuming monthly for now)
+        // 2. For each budget, calculate the spent amount for the current period
         const budgetsWithSpent = await Promise.all(budgets.map(async (budget) => {
-            // Determine start and end of the current month
-            // TODO: Enhance this to handle different budget periods (yearly, quarterly) based on budget.period and budget.start_date
-            const startOfMonth = moment().startOf('month').format('YYYY-MM-DD HH:mm:ss');
-            const endOfMonth = moment().endOf('month').format('YYYY-MM-DD HH:mm:ss');
+            // Determine start and end of the current month for simplicity in this refactor.
+            // TODO: Enhance to handle budget.period (monthly, quarterly, yearly) and budget.start_date accurately.
+            const startOfMonth = moment(budget.start_date).startOf('month').format('YYYY-MM-DD');
+            const endOfMonth = moment(budget.start_date).endOf('month').format('YYYY-MM-DD');
 
-            const spentResult = await new Promise((resolve, reject) => {
-                const sql = `
-                    SELECT SUM(amount) as totalSpent 
-                    FROM transactions 
-                    WHERE user_id = ? 
-                      AND category = ? 
-                      AND type = 'expense' 
-                      AND date BETWEEN ? AND ?`;
-                db.get(sql, [userId, budget.category, startOfMonth, endOfMonth], (err, row) => {
-                    if (err) reject(err);
-                    else resolve(row);
-                });
-            });
+            const spentResult = await query(
+                `SELECT SUM(amount) as totalSpent 
+                 FROM transactions 
+                 WHERE user_id = $1 
+                   AND category = $2 
+                   AND type = 'expense' 
+                   AND date BETWEEN $3 AND $4`,
+                [userId, budget.category, startOfMonth, endOfMonth]
+            );
             
             return {
                 ...budget,
-                spent: spentResult?.totalSpent || 0 // Add the spent amount
+                spent: parseFloat(spentResult.rows[0]?.totalspent) || 0 // totalspent is lowercase from pg
             };
         }));
 
         res.json({ status: 'success', data: budgetsWithSpent });
-
     } catch (err) {
         console.error('Error fetching budgets:', err);
         res.status(500).json({ status: 'error', message: 'Failed to fetch budgets' });
@@ -58,12 +49,11 @@ router.get('/', async (req, res) => {
 
 // --- POST /api/budgets - Create a new budget ---
 router.post('/', [
-    // Basic Validations - adjust as needed
     body('category').notEmpty().withMessage('Category is required'),
     body('amount').isFloat({ gt: 0 }).withMessage('Amount must be a positive number'),
     body('period').isIn(['monthly', 'quarterly', 'yearly']).withMessage('Invalid period'),
-    body('start_date').isISO8601().toDate().withMessage('Invalid start date')
-], (req, res) => {
+    body('start_date').isISO8601().toDate().withMessage('Invalid start date format')
+], async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
         return res.status(400).json({ status: 'error', errors: errors.array() });
@@ -72,35 +62,31 @@ router.post('/', [
     const userId = req.user.id;
     const { category, amount, period, start_date, notes } = req.body;
 
-    const sql = `INSERT INTO budgets (user_id, category, amount, period, start_date, notes) 
-                 VALUES (?, ?, ?, ?, ?, ?)`;
-    const params = [userId, category, amount, period, start_date, notes || null];
-
-    db.run(sql, params, function (err) {
-        if (err) {
-            console.error('Error creating budget:', err);
-            return res.status(500).json({ status: 'error', message: 'Failed to create budget' });
+    try {
+        const result = await query(
+            `INSERT INTO budgets (user_id, category, amount, period, start_date, notes) 
+             VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+            [userId, category, amount, period, start_date, notes || null]
+        );
+        if (result.rows.length > 0) {
+            res.status(201).json({ status: 'success', data: result.rows[0] });
+        } else {
+            console.error('Error creating budget: No rows returned');
+            res.status(500).json({ status: 'error', message: 'Failed to create budget' });
         }
-        // Get the newly created budget and return it
-        db.get('SELECT * FROM budgets WHERE id = ?', [this.lastID], (err, row) => {
-             if (err) {
-                 console.error('Error fetching created budget:', err);
-                 // Still return success, but maybe without the full object
-                 return res.status(201).json({ status: 'success', message: 'Budget created', id: this.lastID });
-             }
-             res.status(201).json({ status: 'success', data: row });
-        });
-    });
+    } catch (err) {
+        console.error('Error creating budget:', err);
+        res.status(500).json({ status: 'error', message: 'Failed to create budget' });
+    }
 });
 
 // --- PUT /api/budgets/:id - Update an existing budget ---
 router.put('/:id', [
-    // Similar validations as POST
     body('category').notEmpty().withMessage('Category is required'),
     body('amount').isFloat({ gt: 0 }).withMessage('Amount must be a positive number'),
     body('period').isIn(['monthly', 'quarterly', 'yearly']).withMessage('Invalid period'),
-    body('start_date').isISO8601().toDate().withMessage('Invalid start date')
-], (req, res) => {
+    body('start_date').isISO8601().toDate().withMessage('Invalid start date format')
+], async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
         return res.status(400).json({ status: 'error', errors: errors.array() });
@@ -109,50 +95,41 @@ router.put('/:id', [
     const userId = req.user.id;
     const budgetId = req.params.id;
     const { category, amount, period, start_date, notes } = req.body;
-    const updatedAt = moment().format('YYYY-MM-DD HH:mm:ss'); // Update timestamp
+    // updated_at will be handled by CURRENT_TIMESTAMP in SQL or DB default
 
-    const sql = `UPDATE budgets 
-                 SET category = ?, amount = ?, period = ?, start_date = ?, notes = ?, updated_at = ?
-                 WHERE id = ? AND user_id = ?`;
-    const params = [category, amount, period, start_date, notes || null, updatedAt, budgetId, userId];
+    try {
+        const result = await query(
+            `UPDATE budgets 
+             SET category = $1, amount = $2, period = $3, start_date = $4, notes = $5, updated_at = CURRENT_TIMESTAMP
+             WHERE id = $6 AND user_id = $7 RETURNING *`,
+            [category, amount, period, start_date, notes || null, budgetId, userId]
+        );
 
-    db.run(sql, params, function (err) {
-        if (err) {
-            console.error('Error updating budget:', err);
-            return res.status(500).json({ status: 'error', message: 'Failed to update budget' });
-        }
-        if (this.changes === 0) {
+        if (result.rowCount === 0) {
             return res.status(404).json({ status: 'error', message: 'Budget not found or user unauthorized' });
         }
-         // Get the updated budget and return it
-        db.get('SELECT * FROM budgets WHERE id = ?', [budgetId], (err, row) => {
-             if (err) {
-                 console.error('Error fetching updated budget:', err);
-                 return res.status(200).json({ status: 'success', message: 'Budget updated', id: budgetId });
-             }
-             res.json({ status: 'success', data: row });
-        });
-    });
+        res.json({ status: 'success', data: result.rows[0] });
+    } catch (err) {
+        console.error('Error updating budget:', err);
+        res.status(500).json({ status: 'error', message: 'Failed to update budget' });
+    }
 });
 
 // --- DELETE /api/budgets/:id - Delete a budget ---
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res) => {
     const userId = req.user.id;
     const budgetId = req.params.id;
 
-    const sql = 'DELETE FROM budgets WHERE id = ? AND user_id = ?';
-    
-    db.run(sql, [budgetId, userId], function (err) {
-        if (err) {
-            console.error('Error deleting budget:', err);
-            return res.status(500).json({ status: 'error', message: 'Failed to delete budget' });
-        }
-        if (this.changes === 0) {
+    try {
+        const result = await query('DELETE FROM budgets WHERE id = $1 AND user_id = $2', [budgetId, userId]);
+        if (result.rowCount === 0) {
             return res.status(404).json({ status: 'error', message: 'Budget not found or user unauthorized' });
         }
         res.json({ status: 'success', message: 'Budget deleted successfully' });
-    });
+    } catch (err) {
+        console.error('Error deleting budget:', err);
+        res.status(500).json({ status: 'error', message: 'Failed to delete budget' });
+    }
 });
-
 
 module.exports = router; 

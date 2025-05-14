@@ -1,8 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const { body, validationResult } = require('express-validator');
-const { db } = require('../db/database');
+const { query } = require('../db/database');
 const aiService = require('../server/services/aiService');
+const authenticateToken = require('../middleware/auth');
+
+// Middleware to ensure authentication for all goal routes
+router.use(authenticateToken);
 
 // Validation middleware
 const validateGoal = [
@@ -17,24 +21,11 @@ const validateGoal = [
 // Get all goals for the user
 router.get('/', async (req, res) => {
     try {
-        db.all(
-            'SELECT * FROM goals WHERE user_id = ? ORDER BY deadline ASC',
-            [req.user.id],
-            (err, goals) => {
-                if (err) {
-                    console.error('Database error:', err);
-                    return res.status(500).json({
-                        status: 'error',
-                        message: 'Database error'
-                    });
-                }
-
-                res.json({
-                    status: 'success',
-                    data: goals
-                });
-            }
-        );
+        const result = await query('SELECT * FROM goals WHERE user_id = $1 ORDER BY deadline ASC', [req.user.id]);
+        res.json({
+            status: 'success',
+            data: result.rows
+        });
     } catch (error) {
         console.error('Error fetching goals:', error);
         res.status(500).json({
@@ -52,32 +43,20 @@ router.get('/:id', async (req, res) => {
         console.log(`Requested Goal ID (req.params.id):`, id, typeof id);
         console.log(`Authenticated User ID (req.user.id):`, req.user.id, typeof req.user.id);
 
-        db.get(
-            'SELECT * FROM goals WHERE id = ? AND user_id = ?',
-            [id, req.user.id],
-            (err, goal) => {
-                if (err) {
-                    console.error('Database error getting single goal:', err);
-                    return res.status(500).json({
-                        status: 'error',
-                        message: 'Database error'
-                    });
-                }
+        const result = await query('SELECT * FROM goals WHERE id = $1 AND user_id = $2', [id, req.user.id]);
 
-                if (!goal) {
-                    console.log(`Goal not found for ID: ${id} and User ID: ${req.user.id}`);
-                    return res.status(404).json({
-                        status: 'error',
-                        message: 'Goal not found'
-                    });
-                }
+        if (result.rows.length === 0) {
+            console.log(`Goal not found for ID: ${id} and User ID: ${req.user.id}`);
+            return res.status(404).json({
+                status: 'error',
+                message: 'Goal not found'
+            });
+        }
 
-                res.json({
-                    status: 'success',
-                    data: goal
-                });
-            }
-        );
+        res.json({
+            status: 'success',
+            data: result.rows[0]
+        });
     } catch (error) {
         console.error('Error fetching single goal:', error);
         res.status(500).json({
@@ -95,49 +74,37 @@ router.get('/:id/progress', async (req, res) => {
         console.log(`Requested Goal ID (req.params.id):`, id, typeof id);
         console.log(`Authenticated User ID (req.user.id):`, req.user.id, typeof req.user.id);
 
-        // Get goal details
-        db.get(
-            'SELECT * FROM goals WHERE id = ? AND user_id = ?',
-            [id, req.user.id],
-            async (err, goal) => {
-                if (err) {
-                    console.error('Database error:', err);
-                    return res.status(500).json({
-                        status: 'error',
-                        message: 'Database error'
-                    });
-                }
+        const goalResult = await query('SELECT * FROM goals WHERE id = $1 AND user_id = $2', [id, req.user.id]);
 
-                if (!goal) {
-                    return res.status(404).json({
-                        status: 'error',
-                        message: 'Goal not found'
-                    });
-                }
+        if (goalResult.rows.length === 0) {
+            return res.status(404).json({
+                status: 'error',
+                message: 'Goal not found'
+            });
+        }
+        const goal = goalResult.rows[0];
 
-                // Calculate progress
-                const progress = (goal.current_amount / goal.target_amount) * 100;
-                const remaining = goal.target_amount - goal.current_amount;
-                const daysLeft = Math.ceil((new Date(goal.deadline) - new Date()) / (1000 * 60 * 60 * 24));
+        // Calculate progress
+        const progress = (goal.current_amount / goal.target_amount) * 100;
+        const remaining = goal.target_amount - goal.current_amount;
+        const daysLeft = Math.ceil((new Date(goal.deadline) - new Date()) / (1000 * 60 * 60 * 24));
 
-                // Get AI recommendations if progress is low
-                let recommendations = null;
-                if (progress < 50 && daysLeft < 30) {
-                    recommendations = await aiService.getGoalRecommendations(goal);
-                }
+        // Get AI recommendations if progress is low
+        let recommendations = null;
+        if (progress < 50 && daysLeft < 30) {
+            recommendations = await aiService.getGoalRecommendations(goal);
+        }
 
-                res.json({
-                    status: 'success',
-                    data: {
-                        goal,
-                        progress: Math.min(progress, 100),
-                        remaining,
-                        daysLeft: Math.max(daysLeft, 0),
-                        recommendations
-                    }
-                });
+        res.json({
+            status: 'success',
+            data: {
+                goal,
+                progress: Math.min(progress, 100),
+                remaining,
+                daysLeft: Math.max(daysLeft, 0),
+                recommendations
             }
-        );
+        });
     } catch (error) {
         console.error('Error fetching goal progress:', error);
         res.status(500).json({
@@ -162,39 +129,20 @@ router.post('/', validateGoal, async (req, res) => {
         const { name, target_amount, current_amount, deadline, type, description } = req.body;
 
         // Insert goal
-        db.run(
-            'INSERT INTO goals (user_id, name, target_amount, current_amount, deadline, type, description) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [req.user.id, name, target_amount, current_amount, deadline, type, description],
-            function(err) {
-                if (err) {
-                    console.error('Database error:', err);
-                    return res.status(500).json({
-                        status: 'error',
-                        message: 'Database error'
-                    });
-                }
-
-                // Get the newly created goal
-                db.get(
-                    'SELECT * FROM goals WHERE id = ?',
-                    [this.lastID],
-                    (err, goal) => {
-                        if (err) {
-                            console.error('Database error:', err);
-                            return res.status(500).json({
-                                status: 'error',
-                                message: 'Database error'
-                            });
-                        }
-
-                        res.status(201).json({
-                            status: 'success',
-                            data: goal
-                        });
-                    }
-                );
-            }
+        const result = await query(
+            'INSERT INTO goals (user_id, name, target_amount, current_amount, deadline, type, description) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+            [req.user.id, name, target_amount, current_amount, deadline, type, description]
         );
+
+        if (result.rows.length > 0) {
+            res.status(201).json({
+                status: 'success',
+                data: result.rows[0]
+            });
+        } else {
+            console.error('Error creating goal: No rows returned');
+            res.status(500).json({ status: 'error', message: 'Failed to create goal' });
+        }
     } catch (error) {
         console.error('Error adding goal:', error);
         res.status(500).json({
@@ -220,61 +168,22 @@ router.put('/:id', validateGoal, async (req, res) => {
         const { name, target_amount, current_amount, deadline, type, description } = req.body;
 
         // Check if goal exists and belongs to user
-        db.get(
-            'SELECT * FROM goals WHERE id = ? AND user_id = ?',
-            [id, req.user.id],
-            (err, goal) => {
-                if (err) {
-                    console.error('Database error:', err);
-                    return res.status(500).json({
-                        status: 'error',
-                        message: 'Database error'
-                    });
-                }
+        const result = await query('SELECT * FROM goals WHERE id = $1 AND user_id = $2', [id, req.user.id]);
 
-                if (!goal) {
-                    return res.status(404).json({
-                        status: 'error',
-                        message: 'Goal not found'
-                    });
-                }
+        if (result.rows.length === 0) {
+            return res.status(404).json({ status: 'error', message: 'Goal not found or user unauthorized' });
+        }
 
-                // Update goal
-                db.run(
-                    'UPDATE goals SET name = ?, target_amount = ?, current_amount = ?, deadline = ?, type = ?, description = ? WHERE id = ? AND user_id = ?',
-                    [name, target_amount, current_amount, deadline, type, description, id, req.user.id],
-                    function(err) {
-                        if (err) {
-                            console.error('Database error:', err);
-                            return res.status(500).json({
-                                status: 'error',
-                                message: 'Database error'
-                            });
-                        }
-
-                        // Get the updated goal
-                        db.get(
-                            'SELECT * FROM goals WHERE id = ?',
-                            [id],
-                            (err, updatedGoal) => {
-                                if (err) {
-                                    console.error('Database error:', err);
-                                    return res.status(500).json({
-                                        status: 'error',
-                                        message: 'Database error'
-                                    });
-                                }
-
-                                res.json({
-                                    status: 'success',
-                                    data: updatedGoal
-                                });
-                            }
-                        );
-                    }
-                );
-            }
+        // Update goal
+        const updateResult = await query(
+            'UPDATE goals SET name = $1, target_amount = $2, current_amount = $3, deadline = $4, type = $5, description = $6, updated_at = CURRENT_TIMESTAMP WHERE id = $7 AND user_id = $8 RETURNING *',
+            [name, target_amount, current_amount, deadline, type, description, id, req.user.id]
         );
+
+        if (updateResult.rowCount === 0) {
+            return res.status(404).json({ status: 'error', message: 'Goal not found or user unauthorized' });
+        }
+        res.json({ status: 'success', data: updateResult.rows[0] });
     } catch (error) {
         console.error('Error updating goal:', error);
         res.status(500).json({
@@ -290,46 +199,12 @@ router.delete('/:id', async (req, res) => {
         const { id } = req.params;
 
         // Check if goal exists and belongs to user
-        db.get(
-            'SELECT * FROM goals WHERE id = ? AND user_id = ?',
-            [id, req.user.id],
-            (err, goal) => {
-                if (err) {
-                    console.error('Database error:', err);
-                    return res.status(500).json({
-                        status: 'error',
-                        message: 'Database error'
-                    });
-                }
+        const result = await query('DELETE FROM goals WHERE id = $1 AND user_id = $2', [id, req.user.id]);
 
-                if (!goal) {
-                    return res.status(404).json({
-                        status: 'error',
-                        message: 'Goal not found'
-                    });
-                }
-
-                // Delete goal
-                db.run(
-                    'DELETE FROM goals WHERE id = ? AND user_id = ?',
-                    [id, req.user.id],
-                    function(err) {
-                        if (err) {
-                            console.error('Database error:', err);
-                            return res.status(500).json({
-                                status: 'error',
-                                message: 'Database error'
-                            });
-                        }
-
-                        res.json({
-                            status: 'success',
-                            message: 'Goal deleted successfully'
-                        });
-                    }
-                );
-            }
-        );
+        if (result.rowCount === 0) {
+            return res.status(404).json({ status: 'error', message: 'Goal not found or user unauthorized' });
+        }
+        res.json({ status: 'success', message: 'Goal deleted successfully' });
     } catch (error) {
         console.error('Error deleting goal:', error);
         res.status(500).json({
@@ -354,70 +229,50 @@ router.post('/:id/contributions', async (req, res) => {
         }
 
         // Check if goal exists and belongs to user
-        db.get(
-            'SELECT * FROM goals WHERE id = ? AND user_id = ?',
-            [id, req.user.id],
-            (err, goal) => {
-                if (err) {
-                    console.error('Database error:', err);
-                    return res.status(500).json({
-                        status: 'error',
-                        message: 'Database error'
-                    });
-                }
+        const goalResult = await query('SELECT * FROM goals WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+        if (goalResult.rows.length === 0) {
+            return res.status(404).json({ status: 'error', message: 'Goal not found' });
+        }
+        const goal = goalResult.rows[0];
 
-                if (!goal) {
-                    return res.status(404).json({
-                        status: 'error',
-                        message: 'Goal not found'
-                    });
-                }
-
-                // Insert contribution into contributions table 
-                db.run(
-                    'INSERT INTO goal_contributions (goal_id, user_id, amount, date, notes) VALUES (?, ?, ?, ?, ?)',
-                    [id, req.user.id, parseFloat(amount), date || new Date().toISOString().split('T')[0], notes || ''],
-                    function(err) {
-                        if (err) {
-                            console.error('Database error:', err);
-                            return res.status(500).json({
-                                status: 'error',
-                                message: 'Database error'
-                            });
-                        }
-
-                        // Update goal current amount
-                        const newAmount = parseFloat(goal.current_amount) + parseFloat(amount);
-                        
-                        db.run(
-                            'UPDATE goals SET current_amount = ? WHERE id = ?',
-                            [newAmount, id],
-                            function(err) {
-                                if (err) {
-                                    console.error('Database error:', err);
-                                    return res.status(500).json({
-                                        status: 'error',
-                                        message: 'Database error'
-                                    });
-                                }
-
-                                res.status(201).json({
-                                    status: 'success',
-                                    data: {
-                                        id: this.lastID,
-                                        goal_id: id,
-                                        amount: parseFloat(amount),
-                                        date: date || new Date().toISOString().split('T')[0],
-                                        notes: notes || '',
-                                        new_balance: newAmount
-                                    }
-                                });
-                            }
-                        );
-                    }
-                );
-            }
+        // Insert contribution
+        const contributionDate = date || new Date().toISOString().split('T')[0];
+        const contributionNotes = notes || '';
+        const contributionResult = await query(
+            'INSERT INTO goal_contributions (goal_id, user_id, amount, date, notes) VALUES ($1, $2, $3, $4, $5) RETURNING id, amount, date, notes',
+            [id, req.user.id, parseFloat(amount), contributionDate, contributionNotes]
         );
+
+        if (contributionResult.rows.length === 0) {
+            console.error('Error adding contribution: No rows returned from insert');
+            return res.status(500).json({ status: 'error', message: 'Failed to add contribution' });
+        }
+        const newContribution = contributionResult.rows[0];
+
+        // Update goal's current amount
+        const newGoalAmount = parseFloat(goal.current_amount) + parseFloat(amount);
+        const updateGoalResult = await query(
+            'UPDATE goals SET current_amount = $1 WHERE id = $2 AND user_id = $3',
+            [newGoalAmount, id, req.user.id]
+        );
+
+        if (updateGoalResult.rowCount === 0) {
+            // This case should ideally be handled with a transaction to rollback the contribution
+            console.error('Error updating goal amount after contribution. Contribution was made but goal not updated.');
+            return res.status(500).json({ status: 'error', message: 'Failed to update goal amount. Contribution might be orphaned.' });
+        }
+
+        res.status(201).json({
+            status: 'success',
+            data: {
+                id: newContribution.id,
+                goal_id: id,
+                amount: newContribution.amount,
+                date: newContribution.date,
+                notes: newContribution.notes,
+                new_balance: newGoalAmount
+            }
+        });
     } catch (error) {
         console.error('Error adding contribution:', error);
         res.status(500).json({
@@ -433,46 +288,21 @@ router.get('/:id/contributions', async (req, res) => {
         const { id } = req.params;
 
         // First, check if the goal exists and belongs to the user
-        db.get(
-            'SELECT id FROM goals WHERE id = ? AND user_id = ?',
-            [id, req.user.id],
-            (err, goal) => {
-                if (err) {
-                    console.error('Database error checking goal existence:', err);
-                    return res.status(500).json({
-                        status: 'error',
-                        message: 'Database error checking goal'
-                    });
-                }
+        const goalCheckResult = await query('SELECT id FROM goals WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+        if (goalCheckResult.rows.length === 0) {
+            return res.status(404).json({ status: 'error', message: 'Goal not found or does not belong to user' });
+        }
 
-                if (!goal) {
-                    return res.status(404).json({
-                        status: 'error',
-                        message: 'Goal not found or does not belong to user'
-                    });
-                }
-
-                // Goal exists, now fetch contributions
-                db.all(
-                    'SELECT * FROM goal_contributions WHERE goal_id = ? AND user_id = ? ORDER BY date DESC',
-                    [id, req.user.id],
-                    (err, contributions) => {
-                        if (err) {
-                            console.error('Database error fetching contributions:', err);
-                            return res.status(500).json({
-                                status: 'error',
-                                message: 'Database error fetching contributions'
-                            });
-                        }
-
-                        res.json({
-                            status: 'success',
-                            data: contributions
-                        });
-                    }
-                );
-            }
+        // Goal exists, now fetch contributions
+        const contributionsResult = await query(
+            'SELECT * FROM goal_contributions WHERE goal_id = $1 AND user_id = $2 ORDER BY date DESC',
+            [id, req.user.id]
         );
+
+        res.json({
+            status: 'success',
+            data: contributionsResult.rows
+        });
     } catch (error) {
         console.error('Error fetching goal contributions:', error);
         res.status(500).json({

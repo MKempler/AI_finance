@@ -821,47 +821,135 @@ function saveGoal() {
 }
 
 // Save goal contribution
-function saveContribution() {
-    const form = document.getElementById('contribution-form');
-    
-    if (form.checkValidity()) {
-        const goalId = document.getElementById('contribution-goal-id').value;
-        const amount = document.getElementById('contribution-amount').value;
-        const date = document.getElementById('contribution-date').value;
-        const notes = document.getElementById('contribution-notes').value;
+function saveContribution(form, saveButton) { // Added saveButton parameter
+    if (!form) {
+        console.error('[saveContribution] Form element was not provided!');
+        showNotification('Error saving contribution: Form not found.', 'error');
+        if(saveButton) { // Re-enable button if form is missing
+            saveButton.disabled = false;
+            saveButton.textContent = 'Save Contribution';
+        }
+        return;
+    }
+
+    const amountInput = form.querySelector('#contribution-amount'); 
+    const dateInput = form.querySelector('#contribution-date');
+    const goalIdInput = form.querySelector('#contribution-goal-id');
+    const notesInput = form.querySelector('#contribution-notes');
+
+    console.log('[saveContribution] Beginning execution with form context.');
+
+    if (!amountInput || !dateInput || !goalIdInput || !notesInput) {
+        console.error('[saveContribution] Critical error: One or more form elements NOT FOUND within the provided form!');
+        showNotification('Critical error: Form fields missing. Please close and reopen.', 'error');
+        if(saveButton) { // Re-enable button if fields are missing
+            saveButton.disabled = false;
+            saveButton.textContent = 'Save Contribution';
+        }
+        return;
+    }
+
+    amountInput.blur();
+
+    setTimeout(() => {
+        console.log('[saveContribution] Executing deferred logic via setTimeout.');
+        console.log('[saveContribution] Amount input element (from form context):', amountInput);
+        console.log('[saveContribution] Amount input value directly read (from form context):', `'${amountInput.value}'`);
+        
+        let amountValueStr = amountInput.value;
+
+        if (!amountValueStr && amountInput.hasAttribute('value')) {
+            const attrValue = amountInput.getAttribute('value');
+            console.warn(`[saveContribution] .value was empty. Trying getAttribute('value'): '${attrValue}'`);
+            if (attrValue) {
+                amountValueStr = attrValue;
+            }
+        }
+
+        let amountIsValid = false;
+        let specificAmountError = '';
+
+        if (!amountValueStr.trim()) {
+            specificAmountError = 'Contribution amount is required.';
+            amountInput.setCustomValidity(specificAmountError);
+        } else {
+            const amountNum = parseFloat(amountValueStr);
+            if (isNaN(amountNum)) {
+                specificAmountError = 'Please enter a valid number for the amount.';
+                amountInput.setCustomValidity(specificAmountError);
+            } else if (amountNum <= 0) {
+                specificAmountError = 'Amount must be greater than zero.';
+                amountInput.setCustomValidity(specificAmountError);
+            } else {
+                if (amountInput.step && amountInput.step === '0.01') {
+                    if (!/^\d+(\.\d{1,2})?$/.test(amountValueStr)) {
+                        specificAmountError = 'Please enter an amount with up to two decimal places (e.g., 50 or 25.50).';
+                        amountInput.setCustomValidity(specificAmountError);
+                    } else {
+                        amountInput.setCustomValidity('');
+                        amountIsValid = true;
+                    }
+                } else {
+                     amountInput.setCustomValidity('');
+                     amountIsValid = true;
+                }
+            }
+        }
+
+        // Use form.checkValidity() instead of document.getElementById('contribution-form').checkValidity()
+        if (!form.checkValidity()) { 
+            console.log('[saveContribution] form.checkValidity() is false (from form context). Reporting validity...');
+            if (amountInput.validationMessage) {
+                console.log('[saveContribution] Amount input validationMessage (from form context):', amountInput.validationMessage);
+            }
+            if (dateInput.validationMessage) {
+                console.log('[saveContribution] Date input validationMessage (from form context):', dateInput.validationMessage);
+            }
+            form.reportValidity();
+            if(saveButton) { // Re-enable button on validation failure
+                saveButton.disabled = false;
+                saveButton.textContent = 'Save Contribution';
+            }
+            return; 
+        }
+        
+        const goalId = goalIdInput.value;
+        const amount = parseFloat(amountInput.value); 
+        const date = dateInput.value; 
+        const notes = notesInput.value;
         
         const contribution = {
-            amount: parseFloat(amount),
+            amount: amount,
             date,
             notes
         };
         
-        // Show loading notification
-        showNotification('Saving contribution...', 'info');
+        // showNotification('Saving contribution...', 'info'); // Already handled by button text change
         
-        // Send data to API
         api.addGoalContribution(goalId, contribution)
             .then(response => {
                 if (response.status === 'success') {
-                    closeContributionModal();
-                    
-                    // Show success message
+                    closeContributionModal(); // << MOVE THIS TO THE TOP
                     showNotification('Contribution added successfully', 'success');
-                    
-                    // Refresh goals
                     loadGoals();
+                    // Button does not need to be re-enabled as modal is closing
                 } else {
                     showNotification(response.message || 'Failed to save contribution', 'error');
+                    if(saveButton) { // Re-enable button on API error
+                        saveButton.disabled = false;
+                        saveButton.textContent = 'Save Contribution';
+                    }
                 }
             })
             .catch(error => {
                 console.error('Error saving contribution:', error);
                 showNotification('Error saving contribution: ' + (error.message || 'Unknown error'), 'error');
+                if(saveButton) { // Re-enable button on exception
+                    saveButton.disabled = false;
+                    saveButton.textContent = 'Save Contribution';
+                }
             });
-    } else {
-        // Trigger form validation
-        form.reportValidity();
-    }
+    }, 0);
 }
 
 // Initialize insights
@@ -2000,11 +2088,13 @@ function filterGoals(filter) {
 
 // Create the contribution modal HTML
 async function createContributionModal(goalId) {
+    // Ensure any existing contribution modal is closed before creating a new one
+    closeContributionModal(); // <<<< ADD THIS CALL HERE
+
     const modal = document.createElement('div');
     modal.className = 'modal contribution-modal';
     modal.id = 'contribution-modal';
     
-    // Show loading message
     modal.innerHTML = `
         <div class="modal-content">
             <div class="modal-header">
@@ -2024,7 +2114,6 @@ async function createContributionModal(goalId) {
     modal.style.display = 'flex';
     
     try {
-        // Fetch goal data from API
         const response = await api.getGoal(goalId);
         
         if (!response.data || response.status !== 'success') {
@@ -2032,8 +2121,33 @@ async function createContributionModal(goalId) {
         }
         
         const goal = response.data;
+        console.log('[createContributionModal] Raw goal data from API:', JSON.stringify(goal));
+
+        const goalName = goal.name || 'Unnamed Goal';
+        const currentAmountRaw = goal.current_amount;
+        const targetAmountRaw = goal.target_amount;
+
+        console.log(`[createContributionModal] Raw current_amount: ${currentAmountRaw}, type: ${typeof currentAmountRaw}`);
+        console.log(`[createContributionModal] Raw target_amount: ${targetAmountRaw}, type: ${typeof targetAmountRaw}`);
+
+        const currentAmount = parseFloat(currentAmountRaw);
+        const targetAmount = parseFloat(targetAmountRaw);
+
+        if (isNaN(currentAmount)) {
+            console.warn('[createContributionModal] current_amount is NaN. Defaulting to 0.', currentAmountRaw);
+        }
+        if (isNaN(targetAmount)) {
+            console.warn('[createContributionModal] target_amount is NaN. Defaulting to 0.', targetAmountRaw);
+        }
         
-        // Update modal with goal data
+        const safeCurrentAmount = isNaN(currentAmount) ? 0 : currentAmount;
+        const safeTargetAmount = isNaN(targetAmount) ? 0 : targetAmount;
+
+        console.log(`[createContributionModal] Safe currentAmount: ${safeCurrentAmount}`);
+        console.log(`[createContributionModal] Safe targetAmount: ${safeTargetAmount}`);
+
+        const remainingAmount = safeTargetAmount - safeCurrentAmount;
+        
         modal.innerHTML = `
             <div class="modal-content">
                 <div class="modal-header">
@@ -2042,12 +2156,12 @@ async function createContributionModal(goalId) {
                 </div>
                 <div class="modal-body">
                     <div class="contribution-details">
-                        <span><strong>Goal:</strong> ${goal.name}</span>
-                        <span><strong>Current:</strong> $${parseFloat(goal.current_amount).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                        <span><strong>Target:</strong> $${parseFloat(goal.target_amount).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                        <span><strong>Remaining:</strong> $${(parseFloat(goal.target_amount) - parseFloat(goal.current_amount)).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                        <span><strong>Goal:</strong> ${goalName}</span>
+                        <span><strong>Current:</strong> $${safeCurrentAmount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                        <span><strong>Target:</strong> $${safeTargetAmount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                        <span><strong>Remaining:</strong> $${remainingAmount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                     </div>
-                    <form id="contribution-form">
+                    <form id="contribution-form"> 
                         <input type="hidden" id="contribution-goal-id" value="${goalId}">
                         <div class="form-group">
                             <label for="contribution-amount">Contribution Amount</label>
@@ -2065,27 +2179,36 @@ async function createContributionModal(goalId) {
                 </div>
                 <div class="modal-footer">
                     <button class="btn-secondary" id="cancel-contribution">Cancel</button>
-                    <button class="btn-primary" id="save-contribution">Add Contribution</button>
+                    <button class="btn-primary" id="save-contribution">Save Contribution</button>
                 </div>
             </div>
         `;
         
-        // Re-attach event listeners
         const closeBtn = modal.querySelector('.close-modal');
         const cancelBtn = modal.querySelector('#cancel-contribution');
         const saveBtn = modal.querySelector('#save-contribution');
+        const formElement = modal.querySelector('#contribution-form');
         
         closeBtn.addEventListener('click', closeContributionModal);
         cancelBtn.addEventListener('click', closeContributionModal);
         
         saveBtn.addEventListener('click', function() {
-            saveContribution();
+            // Disable button immediately on click
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving...'; // Optional: provide visual feedback
+            saveContribution(formElement, saveBtn); // Pass the specific form element and the save button
         });
         
         return modal;
     } catch (error) {
-        console.error('Error fetching goal details:', error);
+        console.error('Error fetching goal details or building modal:', error);
         showNotification('Error loading goal details: ' + (error.message || 'Unknown error'), 'error');
+        // Ensure button is re-enabled if modal creation fails badly before save is attempted
+        const saveBtnAttempt = modal.querySelector('#save-contribution');
+        if(saveBtnAttempt) {
+            saveBtnAttempt.disabled = false;
+            saveBtnAttempt.textContent = 'Save Contribution';
+        }
         closeContributionModal();
         return null;
     }
@@ -2097,11 +2220,32 @@ async function showContributionModal(goalId) {
     await createContributionModal(goalId);
 }
 
-// Close contribution modal
+// Close contribution modal (modified for robustness)
 function closeContributionModal() {
-    const modal = document.getElementById('contribution-modal');
-    if (modal) {
-        modal.remove();
+    console.log('[closeContributionModal] Attempting to close modal(s).');
+    let modal = document.getElementById('contribution-modal');
+    let attempts = 0;
+    while (modal && attempts < 5) { // Loop to ensure removal, with a safety break
+        console.log(`[closeContributionModal] Modal found (attempt ${attempts + 1}), calling modal.remove(). Element:`, modal);
+        try {
+            modal.remove();
+            console.log(`[closeContributionModal] modal.remove() called (attempt ${attempts + 1}).`);
+        } catch (e) {
+            console.error(`[closeContributionModal] Error during modal.remove() (attempt ${attempts + 1}):`, e);
+            // If remove fails, try to hide it as a fallback and break
+            if (modal && typeof modal.style !== 'undefined') modal.style.display = 'none'; 
+            break;
+        }
+        // Check if it still exists
+        modal = document.getElementById('contribution-modal'); 
+        attempts++;
+    }
+
+    if (modal) { // If still found after attempts
+        console.warn('[closeContributionModal] Modal still exists in DOM after multiple removal attempts! Forcibly hiding it.', modal);
+        if (typeof modal.style !== 'undefined') modal.style.display = 'none'; // Fallback to hide
+    } else {
+        console.log('[closeContributionModal] Modal successfully removed from DOM (or was not found initially after loop).');
     }
 }
 
@@ -3250,7 +3394,7 @@ function updateBudgetSummary(budgets) {
 
 // Add placeholder implementation for populateGoalsList
 function populateGoalsList(goals) {
-    console.log('Populating goals list with:', goals);
+    console.log('Populating goals list with (raw data from API):', JSON.parse(JSON.stringify(goals))); // Log the raw goals array
     
     const goalsList = document.querySelector('.goals-list');
     if (!goalsList) {
@@ -3269,6 +3413,7 @@ function populateGoalsList(goals) {
     
     // Add each goal to the list
     goals.forEach(goal => {
+        console.log('Processing goal in populateGoalsList:', JSON.parse(JSON.stringify(goal))); // Log each individual goal being processed
         // Handle both camelCase and snake_case property names
         const currentAmount = goal.currentAmount || goal.current_amount || 0;
         const targetAmount = goal.targetAmount || goal.target_amount || 0;
@@ -3277,8 +3422,10 @@ function populateGoalsList(goals) {
         const formattedDeadline = deadline.toLocaleDateString();
         const goalName = goal.name;
         const goalType = goal.type;
-        const goalId = goal.id;
+        const goalId = goal.id; // <<<<<< THIS IS THE ID BEING USED
         
+        console.log(`Creating goal item for: "${goalName}" with ID: ${goalId}`); // Log the ID being assigned
+
         const goalItem = document.createElement('div');
         goalItem.className = 'goal-item';
         goalItem.dataset.id = goalId;
