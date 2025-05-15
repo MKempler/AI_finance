@@ -1,4 +1,4 @@
-# AI Finance Tracker
+# AI Finance Tracker - https://www.financing-ai.com/
 
 A modern, AI-powered personal finance tracking application with offline support and real-time synchronization.
 
